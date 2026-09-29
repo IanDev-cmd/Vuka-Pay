@@ -4,7 +4,7 @@
   overflow: hidden;
   display: flex;
   flex-direction: column;
-  background: #2a74ff;
+  background: #0d47c4;
   color: #16325c;
   font-family: "Nunito Sans", "Segoe UI", sans-serif;
 }
@@ -13,22 +13,48 @@
   position: absolute;
   inset: 0;
   background:
-    linear-gradient(115deg, #f3f6fb 0 42%, transparent 42.2%),
-    linear-gradient(154deg, transparent 0 58%, #3c86ff 58% 72%, transparent 72.2%),
-    linear-gradient(200deg, transparent 0 46%, #246ef6 46%);
+    linear-gradient(118deg, #f7f9fc 0 38%, transparent 38.4%),
+    linear-gradient(155deg, transparent 0 62%, #1a5ed6 62% 78%, transparent 78.4%),
+    linear-gradient(205deg, transparent 0 48%, #0d4cb8 48%);
   pointer-events: none;
 }
 
-.clone-brand {
+.clone-top {
   position: relative;
-  z-index: 1;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 22px 40px 0;
+}
+
+.clone-brand {
   margin: 0;
-  padding: 28px 0 0 40px;
-  color: #1b2b45;
+  color: #0c1b33;
   font-size: 15px;
   font-weight: 700;
   letter-spacing: -0.02em;
 }
+
+.clone-menu {
+  display: flex;
+  gap: 8px;
+}
+
+.clone-menu button {
+  height: 32px;
+  padding: 0 12px;
+  border: 0;
+  background: #0c1b33;
+  color: #fff;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.clone-menu button.on { background: #0f4fd0; }
 
 .clone-card {
   position: relative;
@@ -48,7 +74,7 @@
 
 .clone-form h1 {
   margin: 0 0 28px;
-  color: #2f7cf6;
+  color: #1d4ed8;
   font-size: 16px;
   font-weight: 700;
   letter-spacing: -0.01em;
@@ -85,7 +111,7 @@ button.clone-row.on strong { color: #2f7cf6; }
   margin-top: 2px;
   border: 0;
   background: transparent;
-  color: #c5ccd6;
+  color: #5c6b80;
   font-family: inherit;
   font-size: 32px;
   font-weight: 300;
@@ -104,6 +130,8 @@ button.clone-row.on strong { color: #2f7cf6; }
   font-weight: 600;
 }
 
+.clone-note.ok { color: #0f4fd0; }
+
 .clone-side {
   display: grid;
   grid-template-rows: 1.15fr 0.85fr;
@@ -116,7 +144,7 @@ button.clone-row.on strong { color: #2f7cf6; }
   gap: 12px;
   align-items: center;
   padding: 28px 22px 20px 26px;
-  background: #0e1c36;
+  background: #071526;
   color: #fff;
 }
 
@@ -178,7 +206,7 @@ button.clone-row.on strong { color: #2f7cf6; }
 
 .clone-pay {
   padding: 22px 26px 24px;
-  background: #2f86ff;
+  background: #0f4fd0;
   color: #fff;
 }
 
@@ -217,8 +245,61 @@ button.clone-row.on strong { color: #2f7cf6; }
 
 .clone-pay button:disabled { opacity: 0.7; cursor: default; }
 
+.clone-navy .pay-qr {
+  width: 78px;
+  height: 78px;
+  background: #fff;
+}
+
+.splash {
+  position: fixed;
+  inset: 0;
+  z-index: 5;
+  display: grid;
+  place-items: center;
+  align-content: center;
+  gap: 10px;
+  background-color: #0d47c4;
+  background-image:
+    linear-gradient(155deg, transparent 0 62%, #1a5ed6 62% 78%, transparent 78.4%),
+    linear-gradient(205deg, transparent 0 48%, #0d4cb8 48%);
+  color: #fff;
+}
+
+.splash.success {
+  background-color: #071526;
+  background-image: none;
+}
+
+.splash-title {
+  margin: 0;
+  font-size: 72px;
+  font-weight: 700;
+  letter-spacing: -0.04em;
+}
+
+.splash-title span {
+  display: inline-block;
+  animation: splash-in 0.7s both;
+}
+
+.splash-sub {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  animation: splash-in 0.6s 0.45s both;
+}
+
+@keyframes splash-in {
+  from { opacity: 0; transform: translateY(22px); }
+  to { opacity: 1; transform: none; }
+}
+
 @media (max-width: 800px) {
-  .clone-brand { padding-left: 20px; }
+  .clone-top { padding: 18px 16px 0; }
+  .splash-title { font-size: 48px; }
   .clone-card { grid-template-columns: 1fr; width: calc(100% - 24px); }
   .clone-side { min-height: 0; }
   .clone-row strong, .clone-row input, .clone-row select { font-size: 26px; }

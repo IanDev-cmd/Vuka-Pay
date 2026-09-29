@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { navigate } from "../nav";
 
 export interface CloneRow {
   label: string;
@@ -25,7 +26,9 @@ export function CloneBoard({
   onAction,
   actionDisabled,
   note,
+  noteTone,
   extra,
+  mark,
 }: {
   title: string;
   rows: CloneRow[];
@@ -37,13 +40,25 @@ export function CloneBoard({
   onAction: () => void;
   actionDisabled?: boolean;
   note?: string | null;
+  noteTone?: "error" | "ok";
   extra?: ReactNode;
+  mark?: ReactNode;
 }) {
   const blue = Math.max(0, Math.min(100, chart));
+  const here = window.location.pathname;
+  const sessionOn = here === "/" || here.startsWith("/pay/") || here.startsWith("/trades/") || here === "/invoice";
   return (
     <div className="clone-page">
       <div className="clone-sky" aria-hidden="true" />
-      <p className="clone-brand">VukaPay</p>
+      <div className="clone-top">
+        <p className="clone-brand">VukaPay</p>
+        <nav className="clone-menu" aria-label="Pages">
+          <button type="button" className={sessionOn ? "on" : undefined} onClick={() => navigate("/")}>Session</button>
+          <button type="button" className={here === "/trades" ? "on" : undefined} onClick={() => navigate("/trades")}>Trades</button>
+          <button type="button" className={here === "/wallet" ? "on" : undefined} onClick={() => navigate("/wallet")}>Wallet</button>
+          <button type="button" className={here === "/install" ? "on" : undefined} onClick={() => navigate("/install")}>Install</button>
+        </nav>
+      </div>
       <section className="clone-card" aria-label={title}>
         <div className="clone-form">
           <h1>{title}</h1>
@@ -64,7 +79,7 @@ export function CloneBoard({
               </div>
             );
           })}
-          {note ? <p className="clone-note">{note}</p> : null}
+          {note ? <p className={noteTone === "ok" ? "clone-note ok" : "clone-note"}>{note}</p> : null}
         </div>
         <div className="clone-side">
           <div className="clone-navy">
@@ -81,10 +96,12 @@ export function CloneBoard({
                 </div>
               ))}
             </div>
-            <svg className="clone-donut" viewBox="0 0 42 42" aria-hidden="true">
-              <circle cx="21" cy="21" r="14" />
-              <circle cx="21" cy="21" r="14" pathLength={100} strokeDasharray={`${blue} ${100 - blue}`} />
-            </svg>
+            {mark ?? (
+              <svg className="clone-donut" viewBox="0 0 42 42" aria-hidden="true">
+                <circle cx="21" cy="21" r="14" />
+                <circle cx="21" cy="21" r="14" pathLength={100} strokeDasharray={`${blue} ${100 - blue}`} />
+              </svg>
+            )}
           </div>
           <div className="clone-pay">
             <p>{totalLabel}</p>

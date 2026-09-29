@@ -4,8 +4,8 @@
   --muted: #9a9aa3;
   --label: #a3a4a8;
   --pill: #f4f4f5;
-  --ux: #5823ef;
-  --blue: #5823ef;
+  --ux: #0d47c4;
+  --blue: #0d47c4;
   --danger: #b42318;
   --card-width: 440px;
   color: var(--ink);
@@ -323,7 +323,7 @@ button, input { font: inherit; color: inherit; }
   font-weight: 600;
   letter-spacing: -0.01em;
   cursor: pointer;
-  background: #5823ef;
+  background: #0d47c4;
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.28), 0 8px 18px rgba(88, 35, 239, 0.22);
 }
 

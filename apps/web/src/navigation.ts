@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { navigate } from "./nav";
 
-const BOARDS = ["/", "/trades", "/wallet"] as const;
+const BOARDS = ["/", "/trades", "/wallet", "/install"] as const;
 const REMOVED = new Set(["/how-it-works", "/support"]);
 
 export function usePath(): string {
@@ -16,12 +16,13 @@ export function usePath(): string {
   return path;
 }
 
-export function useBoardKeys(path: string): void {
+export function useBoardKeys(path: string, enabled = true): void {
   useEffect(() => {
     if (REMOVED.has(path)) navigate("/");
   }, [path]);
 
   useEffect(() => {
+    if (!enabled) return;
     function onKey(event: KeyboardEvent) {
       if (event.code !== "Space" || event.repeat) return;
       const target = event.target;
@@ -33,7 +34,7 @@ export function useBoardKeys(path: string): void {
     }
     window.addEventListener("keydown", onKey, true);
     return () => window.removeEventListener("keydown", onKey, true);
-  }, [path]);
+  }, [path, enabled]);
 }
 
 export function isRemoved(path: string): boolean {

@@ -24,6 +24,13 @@ export function WalletScreen() {
   const previousHold = useRef<string | null>(null);
 
   useEffect(() => {
+    if (sessionStorage.getItem("vukapay-received") === "1") {
+      setReceivedNote("M-Pesa payment received. It is in hold until delivery.");
+      sessionStorage.removeItem("vukapay-received");
+    }
+  }, []);
+
+  useEffect(() => {
     let cancelled = false;
     async function load() {
       try {
@@ -83,6 +90,7 @@ export function WalletScreen() {
         if (selected?.tradeId) navigate(`/trades/${selected.tradeId}`);
       }}
       note={receivedNote ?? error}
+      noteTone={receivedNote ? "ok" : "error"}
     />
   );
 }

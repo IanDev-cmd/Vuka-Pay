@@ -3,13 +3,11 @@ import { ApiError, createInvoice, request, sendInvoice } from "../api";
 import { CloneBoard, shareOf } from "../components/CloneBoard";
 import type { PartyFace } from "../components/Avatar";
 import { DeliveryActions } from "../components/DeliveryActions";
-import { PaymentQr } from "../components/PaymentQr";
 import { PhoneSheet } from "../components/PhoneSheet";
-import { paymentQrText } from "../qrPayload";
 import { placeholderQuote } from "../example";
 import { formatMoney, majorToMinor, normalizePhoneDigits } from "../format";
 import { countryForCurrency, CORRIDOR_NETWORKS } from "../networks";
-import { BuyerScreen } from "./BuyerScreen";
+import { PayBoard } from "./PayBoard";
 import type { Money } from "../types";
 
 type Viewer = "exporter" | "buyer";
@@ -73,6 +71,7 @@ export function SessionScreen({
   const [busy, setBusy] = useState(false);
 
   const editable = viewer === "exporter" && model?.state === "DRAFT";
+  const canType = preview || editable;
 
   useEffect(() => {
     if (preview) return;
@@ -89,15 +88,6 @@ export function SessionScreen({
       cancelled = true;
     };
   }, [preview, token, tradeId, viewer]);
-
-  useEffect(() => {
-    if (!payOpen) return;
-    function onKey(event: KeyboardEvent) {
-      if (event.key === "Escape") setPayOpen(false);
-    }
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [payOpen]);
 
   const button = model ? centerButton(viewer, model) : { id: "", label: "", disabled: true, hidden: true };
 
@@ -169,6 +159,17 @@ export function SessionScreen({
   const netShare = model ? shareOf(model.exporterNet?.amount_minor, model.goods.amount_minor) : { ratio: 0, label: "—" };
   const invoiceShare = model?.exporterNet ? { ratio: Math.max(0, 100 - netShare.ratio), label: `${Math.max(0, 100 - netShare.ratio).toFixed(1)}%` } : { ratio: 50, label: "—" };
 
+  if (payOpen && model) {
+    return (
+      <PayBoard
+        token={token}
+        onClose={() => setPayOpen(false)}
+        fallbackGoods={model.corridor === "KE-KE" ? model.goods : model.buyerAmount}
+        fallbackNet={model.exporterNet ?? model.goods}
+      />
+    );
+  }
+
   return (
     <>
       <CloneBoard
@@ -182,14 +183,20 @@ export function SessionScreen({
                     <input
                       aria-label="Goods value"
                       inputMode="decimal"
-                      disabled={!editable}
+                      disabled={!canType}
                       value={formatMoney(model.goods)}
                       onChange={(event) => {
                         const minor = majorToMinor(event.target.value, "KES");
                         if (!minor) return;
                         setModel((current) =>
                           current
-                            ? { ...current, goods: { amount_minor: minor, currency: "KES" }, vukapayFee: null, exporterNet: null }
+                            ? {
+                                ...current,
+                                goods: { amount_minor: minor, currency: "KES" },
+                                buyerAmount: current.corridor === "KE-KE" ? { amount_minor: minor, currency: "KES" } : current.buyerAmount,
+                                vukapayFee: null,
+                                exporterNet: null,
+                              }
                             : current,
                         );
                       }}
@@ -202,7 +209,7 @@ export function SessionScreen({
                     <input
                       aria-label="Ship within"
                       inputMode="numeric"
-                      disabled={!editable}
+                      disabled={!canType}
                       value={model.shipDays}
                       onChange={(event) =>
                         setModel((current) =>
@@ -219,7 +226,7 @@ export function SessionScreen({
                   value: (
                     <select
                       aria-label="Dispute window"
-                      disabled={!editable}
+                      disabled={!canType}
                       value={model.disputeHours}
                       onChange={(event) => {
                         const value = Number(event.target.value);
@@ -234,7 +241,35 @@ export function SessionScreen({
                     </select>
                   ),
                 },
-                { label: "Corridor", value: corridorLabel(model.corridor) },
+                {
+                  label: "Corridor",
+                  value: (
+                    <select
+                      aria-label="Corridor"
+                      disabled={!canType}
+                      value={model.corridor}
+                      onChange={(event) => {
+                        const value = event.target.value;
+                        if (value === "KE-KE" || value === "KE-UG" || value === "KE-TZ" || value === "KE-RW") {
+                          setModel((current) =>
+                            current
+                              ? {
+                                  ...current,
+                                  corridor: value,
+                                  buyerAmount: value === "KE-KE" ? { ...current.goods } : current.buyerAmount,
+                                }
+                              : current,
+                          );
+                        }
+                      }}
+                    >
+                      <option value="KE-KE">Kenya · M-Pesa</option>
+                      <option value="KE-UG">Kenya → Uganda</option>
+                      <option value="KE-TZ">Kenya → Tanzania</option>
+                      <option value="KE-RW">Kenya → Rwanda</option>
+                    </select>
+                  ),
+                },
               ]
             : [
                 { label: "Goods value", value: "…" },
@@ -291,32 +326,6 @@ export function SessionScreen({
           ) : null
         }
       />
-
-      {payOpen && model ? (
-        <div className="pay-overlay" role="dialog" aria-label="Payment">
-          <div>
-            <div className="pay-overlay-bar">
-              <button type="button" onClick={() => setPayOpen(false)}>
-                Close
-              </button>
-            </div>
-            <BuyerScreen token={token} embedded party={model.parties.exporter} />
-            {token ? (
-              <PaymentQr
-                text={paymentQrText({
-                  invoiceId: model.invoiceNumber,
-                  tradeId: model.tradeId ?? "",
-                  payToken: token,
-                  corridor: model.corridor,
-                  settlementCurrency: "KES",
-                  amount: model.buyerAmount.amount_minor,
-                  payazaCheckoutUrl: null,
-                })}
-              />
-            ) : null}
-          </div>
-        </div>
-      ) : null}
 
       {sheet === "send" && model ? (
         <PhoneSheet
@@ -397,13 +406,6 @@ function collectionCurrency(corridor: string): "KES" | "UGX" | "TZS" | "RWF" {
   if (corridor === "KE-TZ") return "TZS";
   if (corridor === "KE-RW") return "RWF";
   return "UGX";
-}
-
-function corridorLabel(corridor: string): string {
-  if (corridor === "KE-KE") return "Kenya · M-Pesa";
-  if (corridor === "KE-TZ") return "Kenya → Tanzania";
-  if (corridor === "KE-RW") return "Kenya → Rwanda";
-  return "Kenya → Uganda";
 }
 
 function sessionFromApi(body: unknown, viewer: Viewer, fallback: SessionModel): SessionModel {
