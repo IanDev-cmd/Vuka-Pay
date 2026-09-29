@@ -14,6 +14,7 @@ import {
 import { availableActions } from "../src/actions.js";
 import { FEE_ALLOCATION, feeBreakdown } from "../src/fees.js";
 import { issueQuote, observationsFromUsdLegs } from "../src/fx.js";
+import { quoteMock } from "../src/fxMock.js";
 import { normalizePhone } from "../src/phone.js";
 import { minorToPayazaNumber, payazaNumberToMinor } from "../src/money.js";
 import { assertCollectionNetwork, DOCUMENTED_COLLECTION_NETWORKS } from "../src/corridors.js";
@@ -82,6 +83,17 @@ describe("fees quotes and collection amounts", () => {
     expect(quote.buyerAmountMinor > 0n).toBe(true);
     expect(quote.sources).toEqual(["a", "b"]);
     expect(quote.exporterNetKesMinor).toBe(97_500n);
+  });
+
+  it("prices the demo invoice through the quote engine on the mock book", () => {
+    const quote = quoteMock({ itemsMinor: 4_500_000n, to: "UGX", now });
+    expect(quote.sources).toEqual(["mock-exchangerate", "mock-fawaz"]);
+    expect(quote.feeMinor).toBe(90_000n);
+    expect(quote.exporterNetKesMinor).toBe(4_410_000n);
+    expect(quote.buyerAmountMinor > 1_000_000n).toBe(true);
+    expect(quoteMock({ itemsMinor: 10_000n, to: "KES", now }).midRate).toBe("1");
+    expect(quoteMock({ itemsMinor: 10_000n, to: "TZS", now }).buyerAmountMinor > 0n).toBe(true);
+    expect(quoteMock({ itemsMinor: 10_000n, to: "RWF", now }).buyerAmountMinor > 0n).toBe(true);
   });
 
   it("fails closed when a source is stale or they diverge", () => {

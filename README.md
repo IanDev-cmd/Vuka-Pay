@@ -2,7 +2,7 @@
 
 Backend for conditional-release trade payments between Kenyan exporters and buyers paying with Ugandan or Tanzanian mobile money, on Payaza's rails.
 
-This tree does not mark collection or payout `LIVE`. Those capabilities stay `GATED` until they have been exercised against a Payaza tenant and recorded in `docs/verification-log.json`. There is no mock provider and no seeded trades.
+This tree does not mark collection or payout `LIVE`. Those capabilities stay `GATED` until they have been exercised against a Payaza tenant and recorded in `docs/verification-log.json`. Payaza is not mocked. `FX_MODE=mock` runs the real quote engine on a demo USD book.
 
 ## Run
 
@@ -40,7 +40,7 @@ That calls `GET mainaccounts` and account enquiry. It writes `docs/verification-
 | KES M-Pesa payout | GATED | Payout client is implemented. `bank_code` is taken only from Payaza's Bank Codes response plus `PAYAZA_KES_MOMO_BANK_CODE`. Not yet exercised. |
 | Webhook HMAC | Implemented, GATED as LIVE | Verifier matches the documented algorithm. LIVE waits for a real Payaza delivery. |
 | Conditional release | LIVE as VukaPay's ledger | Payaza has no escrow product. Funds sit in the Payaza merchant balance. |
-| FX quoting | LIVE when two feeds respond | ExchangeRate-API and fawazahmed0 were probed on 2026-09-28 and both had KES, UGX, and TZS. A missing or divergent source fails closed. |
+| FX quoting | LIVE when two feeds respond, or the demo book when `FX_MODE=mock` | ExchangeRate-API and fawazahmed0 were probed on 2026-09-28 and both had KES, UGX, and TZS. Mock mode uses the same median, spread, and fee path on `mock-exchangerate` and `mock-fawaz`. A missing or divergent source fails closed. |
 | FX settlement | GATED | OpenAPI has no conversion API. Set `FX_SETTLEMENT_MODE=treasury_float` only when KES payouts are funded from a real KES balance and conversions are recorded with evidence. |
 | Virtual accounts, cards, payment links, splits, sub-accounts | GATED | Typed paths exist. Methods refuse to send. |
 | Trade-record score | GATED | Off until `CREDIT_ENABLED=true`. Output is not a credit approval. |

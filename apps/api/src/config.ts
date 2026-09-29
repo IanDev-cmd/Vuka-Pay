@@ -20,6 +20,7 @@ const Env = z.object({
   PAYAZA_TRANSACTION_PIN: z.string().optional(),
   PAYAZA_SIGN_PAYOUTS: z.enum(["true", "false"]).default("false"),
   APP_SECRET: z.string().min(32).default("dev-only-secret-change-me-please-32"),
+  FX_MODE: z.enum(["live", "mock"]).optional(),
   FX_SPREAD_BPS: z.coerce.number().default(150),
   FX_QUOTE_TTL_SECONDS: z.coerce.number().default(900),
   FX_MAX_SOURCE_DEVIATION_BPS: z.coerce.number().default(150),
@@ -58,6 +59,12 @@ export type AppConfig = z.infer<typeof Env> & {
   collectionNetworks: CollectionNetwork[];
   smsConfigured: boolean;
 };
+
+/** Live feeds in production. The demo book elsewhere, unless FX_MODE is set. */
+export function fxMode(env: NodeJS.ProcessEnv = process.env): "live" | "mock" {
+  if (env.FX_MODE === "live" || env.FX_MODE === "mock") return env.FX_MODE;
+  return env.NODE_ENV === "production" ? "live" : "mock";
+}
 
 export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
   const parsed = Env.parse(env);

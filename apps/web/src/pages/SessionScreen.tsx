@@ -4,7 +4,7 @@ import { CloneBoard, shareOf } from "../components/CloneBoard";
 import type { PartyFace } from "../components/Avatar";
 import { DeliveryActions } from "../components/DeliveryActions";
 import { PhoneSheet } from "../components/PhoneSheet";
-import { placeholderQuote } from "../example";
+import { corridorOfDemo, placeholderQuote } from "../example";
 import { formatMoney, majorToMinor, normalizePhoneDigits } from "../format";
 import { countryForCurrency, CORRIDOR_NETWORKS } from "../networks";
 import { PayBoard } from "./PayBoard";
@@ -61,7 +61,8 @@ export function SessionScreen({
   token: string | null;
 }) {
   const preview = !tradeId && !token;
-  const [model, setModel] = useState<SessionModel | null>(() => (preview ? placeholderSession(viewer) : null));
+  const demoId = tradeId?.startsWith("demo-") ? tradeId : null;
+  const [model, setModel] = useState<SessionModel | null>(() => (preview || demoId ? placeholderSession(viewer, demoId) : null));
   const [error, setError] = useState<string | null>(null);
   const [payOpen, setPayOpen] = useState(false);
   const [sheet, setSheet] = useState<"send" | "code" | "dispute" | null>(null);
@@ -74,7 +75,7 @@ export function SessionScreen({
   const canType = preview || editable;
 
   useEffect(() => {
-    if (preview) return;
+    if (preview || demoId) return;
     let cancelled = false;
     const path = token ? `/v1/pay/${encodeURIComponent(token)}` : `/v1/trades/${encodeURIComponent(tradeId ?? "")}`;
     request<unknown>(path)
@@ -87,7 +88,7 @@ export function SessionScreen({
     return () => {
       cancelled = true;
     };
-  }, [preview, token, tradeId, viewer]);
+  }, [preview, demoId, token, tradeId, viewer]);
 
   const button = model ? centerButton(viewer, model) : { id: "", label: "", disabled: true, hidden: true };
 
@@ -189,17 +190,7 @@ export function SessionScreen({
                       onChange={(event) => {
                         const minor = majorToMinor(event.target.value, "KES");
                         if (!minor) return;
-                        setModel((current) =>
-                          current
-                            ? {
-                                ...current,
-                                goods: { amount_minor: minor, currency: "KES" },
-                                buyerAmount: current.corridor === "KE-KE" ? { amount_minor: minor, currency: "KES" } : current.buyerAmount,
-                                vukapayFee: null,
-                                exporterNet: null,
-                              }
-                            : current,
-                        );
+                        setModel((current) => (current ? retarget(current, current.corridor, minor, preview || Boolean(demoId)) : current));
                       }}
                     />
                   ),
@@ -252,15 +243,7 @@ export function SessionScreen({
                       onChange={(event) => {
                         const value = event.target.value;
                         if (value === "KE-KE" || value === "KE-UG" || value === "KE-TZ" || value === "KE-RW") {
-                          setModel((current) =>
-                            current
-                              ? {
-                                  ...current,
-                                  corridor: value,
-                                  buyerAmount: value === "KE-KE" ? { ...current.goods } : current.buyerAmount,
-                                }
-                              : current,
-                          );
+                          setModel((current) => (current ? retarget(current, value, current.goods.amount_minor, preview || Boolean(demoId)) : current));
                         }
                       }}
                     >
@@ -377,11 +360,38 @@ export function SessionScreen({
   );
 }
 
-function placeholderSession(viewer: Viewer): SessionModel {
-  const quote = placeholderQuote();
+function retarget(current: SessionModel, corridor: SessionModel["corridor"], goodsMinor: string, useEngine: boolean): SessionModel {
+  if (!useEngine) {
+    return {
+      ...current,
+      corridor,
+      goods: { amount_minor: goodsMinor, currency: "KES" },
+      buyerAmount: corridor === "KE-KE" ? { amount_minor: goodsMinor, currency: "KES" } : current.buyerAmount,
+      vukapayFee: null,
+      exporterNet: null,
+    };
+  }
+  const quote = placeholderQuote(corridor, BigInt(goodsMinor));
   return {
-    state: viewer === "exporter" ? "DRAFT" : "AWAITING_PAYMENT",
-    corridor: "KE-UG",
+    ...current,
+    corridor,
+    goods: quote.fees.goods,
+    vukapayFee: quote.fees.vukapay_fee,
+    exporterNet: quote.exporter_net,
+    rate: quote.rate,
+    expiresAt: quote.expires_at,
+    buyerAmount: quote.buyer_amount,
+  };
+}
+
+function placeholderSession(viewer: Viewer, demoId: string | null = null): SessionModel {
+  const corridor = corridorOfDemo(demoId);
+  const quote = placeholderQuote(corridor);
+  const state =
+    demoId === "demo-tz" ? "FUNDED" : demoId === "demo-rw" ? "SHIPPED" : demoId === "demo-ke" ? "PAYMENT_PENDING" : viewer === "exporter" ? "DRAFT" : "AWAITING_PAYMENT";
+  return {
+    state,
+    corridor,
     goods: quote.fees.goods,
     vukapayFee: quote.fees.vukapay_fee,
     payazaLabel: "Recorded on settlement",
@@ -396,7 +406,7 @@ function placeholderSession(viewer: Viewer): SessionModel {
     parties: { exporter: EXPORTER, buyer: BUYER },
     actions: viewer === "exporter" ? ["send_invoice"] : ["continue_to_payment"],
     mpesaReference: null,
-    tradeId: null,
+    tradeId: demoId,
     nfcToken: null,
     limits: { min: null, max: null },
   };

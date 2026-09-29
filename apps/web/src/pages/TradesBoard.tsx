@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { listTrades } from "../api";
+import { DEMO_TRADES } from "../example";
 import { CloneBoard, shareOf } from "../components/CloneBoard";
 import { navigate } from "../nav";
 
@@ -16,10 +17,10 @@ export function TradesBoard() {
         setRows(next);
         setError(null);
       })
-      .catch((reason: unknown) => {
+      .catch(() => {
         if (cancelled) return;
-        setRows([]);
-        setError(reason instanceof Error ? reason.message : "Could not load trades");
+        setRows(DEMO_TRADES.map((row) => ({ id: row.id, state: row.state })));
+        setError("Demo trades. These are not on the ledger.");
       });
     return () => {
       cancelled = true;

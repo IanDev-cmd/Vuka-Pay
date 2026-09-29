@@ -8,6 +8,7 @@ export * from "./actions.js";
 export * from "./ledger.js";
 export * from "./fees.js";
 export * from "./fx.js";
+export * from "./fxMock.js";
 export * from "./verification.js";
 export * from "./credit.js";
 export * from "./risk.js";

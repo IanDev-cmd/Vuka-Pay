@@ -1,4 +1,5 @@
-import { DomainError, quotePerKes, type RateObservation } from "@vukapay/core";
+import { DomainError, mockObservations, quotePerKes, type RateObservation } from "@vukapay/core";
+import { fxMode } from "./config.js";
 
 let fxProbeCache: { ok: boolean; at: number } | null = null;
 
@@ -16,6 +17,7 @@ export async function fxFeedsHealthy(now = Date.now()): Promise<boolean> {
 }
 
 export async function loadObservations(quote: "UGX" | "TZS" | "RWF", now = new Date()): Promise<RateObservation[]> {
+  if (fxMode() === "mock") return mockObservations(quote, now);
   const [exchange, fawaz] = await Promise.allSettled([exchangeRateApi(now), fawazRate()]);
   const observations: RateObservation[] = [];
   for (const result of [exchange, fawaz]) {
