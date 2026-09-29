@@ -1,14 +1,12 @@
 import { useEffect, useState } from "react";
-import { ApiError, createInvoice, listTrades, request, sendInvoice } from "../api";
+import { ApiError, createInvoice, request, sendInvoice } from "../api";
 import { Avatar, type PartyFace } from "../components/Avatar";
 import { DeliveryActions } from "../components/DeliveryActions";
 import { PaymentQr } from "../components/PaymentQr";
 import { PhoneSheet } from "../components/PhoneSheet";
-import { PwaInstall } from "../components/PwaInstall";
 import { paymentQrText } from "../qrPayload";
 import { placeholderQuote } from "../example";
 import { formatMoney, majorToMinor, normalizePhoneDigits } from "../format";
-import { navigate } from "../nav";
 import { countryForCurrency, CORRIDOR_NETWORKS } from "../networks";
 import { BuyerScreen } from "./BuyerScreen";
 import type { Money } from "../types";
@@ -58,17 +56,14 @@ export function SessionScreen({
   viewer,
   tradeId,
   token,
-  page = "session",
 }: {
   viewer: Viewer;
   tradeId: string | null;
   token: string | null;
-  page?: "session" | "trades" | "how" | "support";
 }) {
   const preview = !tradeId && !token;
   const [model, setModel] = useState<SessionModel | null>(() => (preview ? placeholderSession(viewer) : null));
   const [error, setError] = useState<string | null>(null);
-  const [menu, setMenu] = useState(false);
   const [termsOpen, setTermsOpen] = useState(false);
   const [payOpen, setPayOpen] = useState(false);
   const [sheet, setSheet] = useState<"send" | "code" | "dispute" | null>(null);
@@ -76,7 +71,6 @@ export function SessionScreen({
   const [code, setCode] = useState("");
   const [reason, setReason] = useState("");
   const [busy, setBusy] = useState(false);
-  const [trades, setTrades] = useState<{ id: string; state: string }[] | null>(null);
 
   const editable = viewer === "exporter" && model?.state === "DRAFT";
 
@@ -104,20 +98,6 @@ export function SessionScreen({
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [payOpen]);
-
-  useEffect(() => {
-    if (page !== "trades") return;
-    listTrades()
-      .then((rows) => {
-        setTrades(rows);
-        setError(null);
-      })
-      .catch((reason: unknown) => {
-        setTrades([]);
-        const message = reason instanceof Error ? reason.message : "Could not load trades";
-        setError(message === "Internal Server Error" ? "Could not load trades" : message);
-      });
-  }, [page]);
 
   const button = model ? centerButton(viewer, model) : { id: "", label: "", disabled: true, hidden: true };
   const faces = model ? partyCards(model) : [];
@@ -185,67 +165,9 @@ export function SessionScreen({
   return (
     <div className="session-page">
       <div className="session-shell">
-        <header className="session-bar">
-          <button type="button" className="wordmark" onClick={() => navigate("/")}>
-            <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true">
-              <path d="M2.2 8.2 L6.1 12.1 L13.8 3.6" fill="none" stroke="#1bb82b" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
-            </svg>
-            VukaPay
-          </button>
-          <div className="session-tools">
-          <nav className={menu ? "session-nav open" : "session-nav"}>
-            <button type="button" aria-current={page === "trades" ? "page" : undefined} onClick={() => navigate("/trades")}>
-              Trades
-            </button>
-            <button type="button" aria-current={page === "how" ? "page" : undefined} onClick={() => navigate("/how-it-works")}>
-              How it works
-            </button>
-            <button type="button" aria-current={page === "session" ? "page" : undefined} onClick={() => navigate(viewer === "exporter" ? "/invoice" : "/")}>
-              Session
-            </button>
-            <button type="button" onClick={() => navigate("/wallet")}>
-              Wallet
-            </button>
-            <button type="button" aria-current={page === "support" ? "page" : undefined} onClick={() => navigate("/support")}>
-              Support
-            </button>
-            <PwaInstall />
-          </nav>
-          <button type="button" className="menu-button" aria-label="Menu" onClick={() => setMenu((open) => !open)}>
-            <span />
-            <span />
-            <span />
-          </button>
-          </div>
-        </header>
+        {!model ? <p className="progress-line">{error ?? "…"}</p> : null}
 
-        {page === "trades" ? (
-          <section className="plain-page">
-            <h1>Trades</h1>
-            {trades === null && !error ? <p>…</p> : null}
-            {(trades ?? []).map((row) => (
-              <button key={row.id} type="button" className="next-card" onClick={() => navigate(`/trades/${row.id}`)}>
-                <span className="next-copy">
-                  <strong>{row.id}</strong>
-                  <small>→</small>
-                </span>
-              </button>
-            ))}
-            {error ? <p className="session-error">{error}</p> : null}
-            {trades && trades.length === 0 && !error ? <p>—</p> : null}
-          </section>
-        ) : null}
-
-        {page === "how" || page === "support" ? (
-          <section className="plain-page">
-            <h1>{page === "how" ? "How it works" : "Support"}</h1>
-            <p>We hold your money safely until the goods arrive.</p>
-          </section>
-        ) : null}
-
-        {page === "session" && !model ? <p className="progress-line">{error ?? "…"}</p> : null}
-
-        {page === "session" && model ? (
+        {model ? (
           <div className="session-grid">
             <div className="headline-block">
               <h1 className="session-title">

@@ -20,7 +20,6 @@ export function WalletScreen() {
   const [payouts, setPayouts] = useState<PayoutListItem[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [selectedId, setSelectedId] = useState("in_hold");
-  const [menu, setMenu] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -46,34 +45,6 @@ export function WalletScreen() {
   return (
     <div className="wallet-page">
       <div className="wallet-shell">
-        <header className="wallet-bar">
-          <button type="button" className="wallet-logo" onClick={() => navigate("/")}>
-            VukaPay
-          </button>
-          <button type="button" className="wallet-menu" aria-label="Menu" onClick={() => setMenu((open) => !open)}>
-            <span />
-            <span />
-            <span />
-          </button>
-          <nav className={menu ? "wallet-links open" : "wallet-links"}>
-            <button type="button" onClick={() => navigate("/")}>
-              Session
-            </button>
-            <button type="button" onClick={() => navigate("/trades")}>
-              Trades
-            </button>
-            <button type="button" onClick={() => navigate("/how-it-works")}>
-              How it works
-            </button>
-            <button type="button" onClick={() => navigate("/wallet")}>
-              Wallet
-            </button>
-            <button type="button" onClick={() => navigate("/support")}>
-              Support
-            </button>
-          </nav>
-        </header>
-
         <h1 className="wallet-title">Wallet</h1>
         <p className="wallet-sub">We hold your money safely until the goods arrive.</p>
         {error ? <p className="wallet-error">{error}</p> : null}
@@ -133,17 +104,17 @@ export function WalletScreen() {
                   <strong>{balance.pending_payout ? formatMoney(balance.pending_payout, true) : "—"}</strong>
                 </div>
               </div>
+              <button
+                type="button"
+                className="wallet-action"
+                aria-disabled={selected?.tradeId ? undefined : true}
+                onClick={() => {
+                  if (selected?.tradeId) navigate(`/trades/${selected.tradeId}`);
+                }}
+              >
+                Open trade
+              </button>
             </article>
-            <button
-              type="button"
-              className="wallet-action"
-              aria-disabled={selected?.tradeId ? undefined : true}
-              onClick={() => {
-                if (selected?.tradeId) navigate(`/trades/${selected.tradeId}`);
-              }}
-            >
-              Open trade
-            </button>
           </div>
         </div>
       </div>

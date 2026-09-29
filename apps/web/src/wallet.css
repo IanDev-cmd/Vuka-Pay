@@ -1,17 +1,20 @@
 .wallet-page {
-  min-height: 100vh;
-  background: #fef9e3;
-  padding: 42px 20px 56px;
+  width: min(1080px, calc(100% - 32px));
+  flex: 1;
+  background: #f3f4f6;
+  padding: 8px 0 56px;
   color: #161c32;
   font-family: Inter, "Segoe UI", sans-serif;
 }
 
 .wallet-shell {
-  max-width: 960px;
+  width: 100%;
   margin: 0 auto;
-  background: #f6f9fe;
-  padding: 26px 36px 72px;
-  box-shadow: 0 22px 60px rgba(70, 50, 10, 0.08);
+  background: #f7f8fa;
+  padding: 26px 28px 72px;
+  box-shadow: none;
+  border-radius: 0;
+  text-align: center;
 }
 
 .wallet-bar {
@@ -78,18 +81,20 @@
 }
 
 .wallet-title {
-  margin: 36px 0 0;
+  margin: 8px 0 0;
   font-size: 28px;
   line-height: 1.25;
   font-weight: 700;
   letter-spacing: -0.03em;
   color: #161c32;
+  text-align: center;
 }
 
 .wallet-sub {
   margin: 8px 0 0;
   color: #9aa1b2;
   font-size: 14px;
+  text-align: center;
 }
 
 .wallet-error {
@@ -100,20 +105,24 @@
 
 .wallet-grid {
   display: grid;
-  grid-template-columns: minmax(0, 1.15fr) minmax(280px, 0.85fr);
-  gap: 28px;
-  align-items: start;
-  margin-top: 28px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+  align-items: stretch;
+  justify-content: center;
+  margin: 28px auto 0;
+  width: 100%;
 }
 
 .tx-list {
-  border: 1px solid #e7e4f4;
-  border-radius: 18px;
+  border: 2px solid #111;
+  border-radius: 0;
   padding: 10px;
   background: #fff;
   display: flex;
   flex-direction: column;
   gap: 8px;
+  min-height: 420px;
+  height: 100%;
 }
 
 .tx-row {
@@ -122,12 +131,13 @@
   align-items: center;
   gap: 12px;
   width: 100%;
+  flex: 1;
   min-height: 72px;
   padding: 12px 16px;
-  border: 1px solid #eceef5;
-  border-radius: 14px;
+  border: 2px solid #111;
+  border-radius: 0;
   background: #fff;
-  text-align: left;
+  text-align: center;
   cursor: pointer;
 }
 
@@ -151,6 +161,10 @@
   border-color: #fff;
 }
 
+.tx-copy {
+  text-align: center;
+}
+
 .tx-copy strong {
   display: block;
   font-size: 16px;
@@ -161,7 +175,7 @@
   display: inline-block;
   margin-top: 6px;
   padding: 2px 8px;
-  border-radius: 999px;
+  border-radius: 0;
   background: #ffe3e0;
   color: #c37d86;
   font-size: 12px;
@@ -189,19 +203,31 @@
 
 .tx-row.selected .tx-amount small { color: rgba(255, 255, 255, 0.75); }
 
-.balance-wrap { position: relative; padding-bottom: 28px; }
+.balance-wrap {
+  position: relative;
+  height: 100%;
+  min-height: 420px;
+}
 
 .balance-card {
   background: #fff;
-  border-radius: 18px;
-  box-shadow: 0 16px 40px rgba(30, 40, 80, 0.06);
+  border: 2px solid #111;
+  border-radius: 0;
+  box-shadow: none;
   padding: 28px 28px 36px;
+  min-height: 420px;
+  height: 100%;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
 }
 
 .balance-kicker {
   margin: 0;
   color: #8b93a7;
   font-size: 15px;
+  text-align: center;
 }
 
 .balance-total {
@@ -211,6 +237,7 @@
   line-height: 1;
   font-weight: 700;
   letter-spacing: -0.045em;
+  text-align: center;
 }
 
 .balance-total span {
@@ -229,6 +256,8 @@
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 12px;
+  width: 100%;
+  text-align: center;
 }
 
 .balance-stats span {
@@ -245,21 +274,17 @@
 }
 
 .wallet-action {
-  position: absolute;
-  left: 50%;
-  bottom: 0;
-  transform: translate(-50%, 40%);
-  min-width: 148px;
+  width: 100%;
   height: 48px;
+  margin-top: auto;
   padding: 0 22px;
   border: 0;
-  border-radius: 8px;
+  border-radius: 0;
   background: #fb0e2c;
   color: #fff;
   font-size: 16px;
   font-weight: 600;
   cursor: pointer;
-  box-shadow: 0 12px 24px rgba(251, 14, 44, 0.28);
 }
 
 .wallet-action[aria-disabled="true"] { cursor: default; }
