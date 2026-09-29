@@ -7,16 +7,27 @@ import { InstallBoard } from "./pages/InstallBoard";
 import { Splash } from "./pages/Splash";
 import { isRemoved, useBoardKeys, usePath } from "./navigation";
 
-export function App() {
-  const path = usePath();
-  const [booting, setBooting] = useState(true);
-  useBoardKeys(path, !booting);
-  if (booting) return <Splash onDone={() => setBooting(false)} />;
-  if (isRemoved(path)) return null;
-  return renderPage(path);
+const TAP_PHONE = "0741784323";
+const TAP_AMOUNT: { amount_minor: string; currency: "KES" } = { amount_minor: "500", currency: "KES" };
+
+function isNfcTap(): boolean {
+  return new URLSearchParams(window.location.search).get("tap") === "1";
 }
 
-function renderPage(path: string) {
+export function App() {
+  const path = usePath();
+  const tap = isNfcTap() || path === "/tap";
+  const [booting, setBooting] = useState(!tap);
+  useBoardKeys(path, !booting && !tap);
+  if (booting) return <Splash onDone={() => setBooting(false)} />;
+  if (isRemoved(path)) return null;
+  return renderPage(path, tap);
+}
+
+function renderPage(path: string, tap: boolean) {
+  if (tap) {
+    return <PayBoard token={null} autoStart initialPhone={TAP_PHONE} kesGoods={TAP_AMOUNT} />;
+  }
   if (path === "/install") return <InstallBoard />;
   if (path === "/trades") return <TradesBoard />;
   if (path === "/wallet") return <WalletScreen />;

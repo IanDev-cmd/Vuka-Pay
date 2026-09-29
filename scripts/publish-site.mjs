@@ -9,7 +9,7 @@ if (!statSync(dist, { throwIfNoEntry: false })?.isDirectory()) {
   throw new Error("dist/ is missing. Build @vukapay/web first.");
 }
 
-const keep = new Set(["assets", "index.html", "manifest.webmanifest", "sw.js", "icon-192.png", "icon-512.png"]);
+const keep = new Set(["assets", "index.html", "tap.html", "manifest.webmanifest", "sw.js", "icon-192.png", "icon-512.png"]);
 for (const name of readdirSync(root)) {
   if (name.startsWith("workbox-") && name.endsWith(".js")) rmSync(join(root, name), { force: true });
 }
