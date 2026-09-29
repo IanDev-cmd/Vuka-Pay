@@ -166,6 +166,7 @@ export function SessionScreen({
         onClose={() => setPayOpen(false)}
         fallbackGoods={model.corridor === "KE-KE" ? model.goods : model.buyerAmount}
         fallbackNet={model.exporterNet ?? model.goods}
+        kesGoods={model.goods}
       />
     );
   }

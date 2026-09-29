@@ -88,6 +88,7 @@ const paths: { method: "get" | "post" | "patch" | "put" | "delete"; path: string
   { method: "get", path: "/v1/payouts/{id}", summary: "Get payout" },
   { method: "get", path: "/v1/pay/{token}", summary: "Buyer invoice view" },
   { method: "post", path: "/v1/pay/{token}/quote/refresh", summary: "Refresh expired quote" },
+  { method: "post", path: "/v1/checkout/mpesa", summary: "Send an M-Pesa STK prompt from the pay form" },
   { method: "post", path: "/v1/pay/{token}/collect", summary: "Start mobile-money collection" },
   { method: "get", path: "/v1/pay/{token}/status", summary: "Buyer status" },
   { method: "get", path: "/v1/pay/{token}/stream", summary: "Buyer SSE" },

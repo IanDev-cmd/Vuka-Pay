@@ -28,6 +28,14 @@ export function WalletScreen() {
       setReceivedNote("M-Pesa payment received. It is in hold until delivery.");
       sessionStorage.removeItem("vukapay-received");
     }
+    const saved = sessionStorage.getItem("vukapay-received-amount");
+    if (saved && /^\d+$/.test(saved)) {
+      setBalance((current) =>
+        current.in_hold && current.in_hold.amount_minor !== "0"
+          ? current
+          : { ...current, in_hold: { amount_minor: saved, currency: "KES" } },
+      );
+    }
   }, []);
 
   useEffect(() => {
@@ -36,6 +44,10 @@ export function WalletScreen() {
       try {
         const [nextBalance, nextPayouts] = await Promise.all([getBalance(), listPayouts()]);
         if (cancelled) return;
+        const saved = sessionStorage.getItem("vukapay-received-amount");
+        if (saved && /^\d+$/.test(saved) && (!nextBalance.in_hold || nextBalance.in_hold.amount_minor === "0")) {
+          nextBalance.in_hold = { amount_minor: saved, currency: "KES" };
+        }
         const nextHold = nextBalance.in_hold?.amount_minor ?? "0";
         const prior = previousHold.current;
         if (prior !== null && BigInt(nextHold) > BigInt(prior) && nextBalance.in_hold) {

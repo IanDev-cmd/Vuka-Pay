@@ -273,6 +273,7 @@ export class VukaService {
     disputeWindowHours?: number;
     observations: RateObservation[];
     partnershipId?: string;
+    fingerprintSalt?: string;
   }) {
     const business = await this.requireBusiness(userId);
     const corridor = corridorForBuyerCurrency(input.buyer.currency);
@@ -295,7 +296,11 @@ export class VukaService {
       openInvoiceKesMinor: await this.deps.repo.openInvoiceMinor(business.id),
     });
     const day = this.now().toISOString().slice(0, 10);
-    const fingerprint = sha256Hex(`${business.id}|${phone}|${itemsMinor}|${day}`);
+    const fingerprint = sha256Hex(
+      input.fingerprintSalt
+        ? `${business.id}|${phone}|${itemsMinor}|${day}|${input.fingerprintSalt}`
+        : `${business.id}|${phone}|${itemsMinor}|${day}`,
+    );
     duplicateInvoice({ existingFingerprints: await this.deps.repo.fingerprints(business.id), fingerprint });
     const quoteConfig = {
       spreadBps: this.deps.config.spreadBps,
@@ -414,6 +419,39 @@ export class VukaService {
       );
     }
     return { invoice: invoiceView(invoice), trade: await this.tradeView(trade.id), pay_url: link.url };
+  }
+
+  /** Starts an M-Pesa STK prompt from the pay form. No buyer link is required. */
+  async checkoutMpesa(input: { phone: string; amountMinor: bigint }) {
+    if (input.amountMinor <= 0n) {
+      throw new DomainError("VALIDATION_FAILED", "Enter the amount in Kenyan shillings", 422);
+    }
+    const user = await this.ensureCheckoutUser();
+    const invoiceViewResult = await this.createInvoice(user.id, {
+      items: [{ description: "Goods", quantity: 1, unitMinor: input.amountMinor }],
+      buyer: { name: "Buyer", phone: input.phone, country: "KE", network: "MPESA", currency: "KES" },
+      observations: [],
+      fingerprintSalt: randomToken(8),
+    });
+    const invoice = await this.deps.repo.invoice(invoiceViewResult.id);
+    if (!invoice) throw new DomainError("NOT_FOUND", "Invoice missing", 404);
+    const trade = this.newTrade(invoice, "checkout");
+    const event = transition("DRAFT", {
+      command: "ISSUE",
+      actor: user.id,
+      reason: "pay now",
+      now: this.now(),
+    });
+    trade.state = event.toState;
+    invoice.status = "INVOICED";
+    await this.deps.repo.transaction(async (repo) => {
+      await repo.saveTrade(trade);
+      await repo.appendEvent(this.eventRow(trade.id, event));
+      await repo.saveInvoice(invoice);
+    });
+    const link = this.buyerLink(trade.id);
+    const collected = await this.collect(link.token, { phone: invoice.buyerPhone, networkCode: "MPESA" });
+    return { ...collected, token: link.token };
   }
 
   async cancelInvoice(userId: string, invoiceId: string) {
@@ -1194,6 +1232,27 @@ export class VukaService {
       effects: event.effects,
       createdAt: event.at,
     };
+  }
+
+  private async ensureCheckoutUser() {
+    const email = "checkout@vukapay.local";
+    let user = await this.deps.repo.userByEmail(email);
+    if (!user) {
+      await this.register({
+        email,
+        password: `Vuka-${randomToken(18)}`,
+        displayName: "VukaPay",
+        language: "en",
+      });
+      user = await this.deps.repo.userByEmail(email);
+    }
+    if (!user) throw new DomainError("DEPENDENCY_UNAVAILABLE", "Checkout account is missing", 503);
+    const business = await this.deps.repo.businessByUser(user.id);
+    if (business && business.kycTier === "NONE") {
+      business.kycTier = "BASIC";
+      await this.deps.repo.saveBusiness(business);
+    }
+    return user;
   }
 
   private async tokens(user: UserRecord) {

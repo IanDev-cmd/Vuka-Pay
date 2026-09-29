@@ -153,6 +153,16 @@ export async function refreshQuote(token: string): Promise<BuyerQuote> {
   return getPay(token);
 }
 
+export async function checkoutMpesa(phone: string, amountMinor: string): Promise<{ token: string }> {
+  const body = await request<unknown>("/v1/checkout/mpesa", {
+    method: "POST",
+    body: JSON.stringify({ phone, amount_minor: amountMinor }),
+  });
+  const token = isRecord(body) && typeof body.token === "string" ? body.token : "";
+  if (!token) throw new ApiError("VALIDATION_FAILED", "M-Pesa prompt did not return a payment", 422);
+  return { token };
+}
+
 export async function collect(token: string, phone: string, networkCode: string): Promise<{ expires_at: string | null }> {
   const body = await request<unknown>(`/v1/pay/${encodeURIComponent(token)}/collect`, {
     method: "POST",

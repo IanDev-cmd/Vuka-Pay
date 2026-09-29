@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { ApiError, collect, getPay, getPayStatus, refreshQuote, retryCollection } from "../api";
+import { ApiError, checkoutMpesa, collect, getPay, getPayStatus, refreshQuote, retryCollection } from "../api";
 import { CloneBoard, shareOf } from "../components/CloneBoard";
 import { PaymentQr } from "../components/PaymentQr";
 import { formatMoney, normalizePhoneDigits } from "../format";
@@ -12,28 +12,49 @@ const FUNDED = new Set(["FUNDED", "SHIPPED", "DELIVERY_CLAIMED", "DISPUTED", "RE
 
 type Phase = "ready" | "prompt" | "received" | "failed";
 
+let tapCheckout: Promise<string> | null = null;
+
+function startTapCheckout(phone: string, amountMinor: string): Promise<string> {
+  if (!tapCheckout) {
+    tapCheckout = checkoutMpesa(normalizePhoneDigits(phone, "KES"), amountMinor)
+      .then((started) => started.token)
+      .catch((error: unknown) => {
+        tapCheckout = null;
+        throw error;
+      });
+  }
+  return tapCheckout;
+}
+
 export function PayBoard({
   token,
   onClose,
   fallbackGoods,
   fallbackNet,
+  kesGoods,
+  autoStart = false,
+  initialPhone = "",
 }: {
   token: string | null;
   onClose?: () => void;
   fallbackGoods?: Money | null;
   fallbackNet?: Money | null;
+  kesGoods?: Money | null;
+  autoStart?: boolean;
+  initialPhone?: string;
 }) {
+  const [activeToken, setActiveToken] = useState(token);
   const [quote, setQuote] = useState<BuyerQuote | null>(null);
-  const [phone, setPhone] = useState("");
+  const [phone, setPhone] = useState(initialPhone);
   const [networkName, setNetworkName] = useState("M-Pesa");
   const [phase, setPhase] = useState<Phase>("ready");
   const [error, setError] = useState<string | null>(null);
-  const [busy, setBusy] = useState(false);
+  const [busy, setBusy] = useState(autoStart);
 
   useEffect(() => {
-    if (!token) return;
+    if (!activeToken) return;
     let cancelled = false;
-    getPay(token)
+    getPay(activeToken)
       .then((next) => {
         if (cancelled) return;
         setQuote(next);
@@ -41,24 +62,27 @@ export function PayBoard({
         if (mpesa) setNetworkName(mpesa.display_name);
       })
       .catch((reason: unknown) => {
-        if (!cancelled) setError(reason instanceof Error ? reason.message : "Could not load this pay link");
+        if (cancelled || phase === "prompt" || phase === "received") return;
+        setError(reason instanceof Error ? reason.message : "Could not load this pay link");
       });
     return () => {
       cancelled = true;
     };
-  }, [token]);
+  }, [activeToken, phase]);
 
   useEffect(() => {
-    if (!token || phase !== "prompt") return;
+    if (!activeToken || phase !== "prompt") return;
     let cancelled = false;
     async function poll() {
       try {
-        const next = await getPayStatus(token as string);
+        if (!activeToken) return;
+        const next = await getPayStatus(activeToken);
         if (cancelled) return;
         const funded = next.collection_status === "COMPLETED" || (next.trade_state != null && FUNDED.has(next.trade_state));
         const failed = next.collection_status === "FAILED" || next.collection_status === "EXPIRED" || next.trade_state === "PAYMENT_FAILED";
         if (funded) {
           sessionStorage.setItem("vukapay-received", "1");
+          if (kesGoods?.amount_minor) sessionStorage.setItem("vukapay-received-amount", kesGoods.amount_minor);
           setPhase("received");
         }
         else if (failed) setPhase("failed");
@@ -72,7 +96,33 @@ export function PayBoard({
       cancelled = true;
       window.clearInterval(timer);
     };
-  }, [token, phase]);
+  }, [activeToken, phase, kesGoods]);
+
+  useEffect(() => {
+    if (!autoStart || !kesGoods?.amount_minor) return;
+    const amountMinor = kesGoods.amount_minor;
+    let cancelled = false;
+    setBusy(true);
+    setError(null);
+    startTapCheckout(initialPhone, amountMinor)
+      .then((nextToken) => {
+        if (cancelled) return;
+        sessionStorage.setItem("vukapay-received-amount", amountMinor);
+        setActiveToken(nextToken);
+        setPhase("prompt");
+      })
+      .catch((reason: unknown) => {
+        if (cancelled) return;
+        setPhase("failed");
+        setError(reason instanceof Error ? reason.message : "Could not send the M-Pesa prompt");
+      })
+      .finally(() => {
+        if (!cancelled) setBusy(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [autoStart, initialPhone, kesGoods?.amount_minor]);
 
   useEffect(() => {
     if (phase !== "received") return;
@@ -81,16 +131,17 @@ export function PayBoard({
   }, [phase]);
 
   const currency = quote?.collection_currency ?? fallbackGoods?.currency ?? "KES";
-  const networks = quote && quote.networks.length > 0 ? quote.networks : CORRIDOR_NETWORKS[currency];
+  const networks = quote && quote.networks.length > 0 ? quote.networks : CORRIDOR_NETWORKS[currency === "KES" ? "KES" : currency];
   const selected = networks.find((row) => row.display_name === networkName) ?? networks.find((row) => row.code === "MPESA") ?? networks[0];
-  const youPay = quote?.buyer_amount ?? fallbackGoods ?? null;
+  const kesCharge = quote?.collection_currency === "KES" ? quote.buyer_amount : kesGoods ?? null;
+  const youPay = selected?.code === "MPESA" ? kesCharge ?? quote?.buyer_amount ?? fallbackGoods ?? null : quote?.buyer_amount ?? fallbackGoods ?? null;
   const exporter = quote?.exporter_net ?? quote?.exporter_receives ?? fallbackNet ?? null;
   const share = shareOf(exporter?.amount_minor, youPay?.amount_minor);
-  const qr = token
+  const qr = activeToken
     ? paymentQrText({
         invoiceId: quote?.invoice_number ?? "",
         tradeId: "",
-        payToken: token,
+        payToken: activeToken,
         corridor: currency === "TZS" ? "KE-TZ" : currency === "RWF" ? "KE-RW" : currency === "KES" ? "KE-KE" : "KE-UG",
         settlementCurrency: "KES",
         amount: youPay?.amount_minor ?? "0",
@@ -100,37 +151,42 @@ export function PayBoard({
 
   async function pay() {
     setError(null);
-    if (!token) {
-      setError("Open the buyer pay link to send the M-Pesa prompt.");
-      return;
-    }
-    if (!selected?.code) {
+    if (selected?.code !== "MPESA") {
       setError("Choose M-Pesa to send the STK prompt.");
       return;
     }
-    if (selected.code === "MPESA" && currency !== "KES") {
-      setError("M-Pesa collects Kenyan shillings.");
+    const digits = normalizePhoneDigits(phone, "KES");
+    if (digits.length < 12) {
+      setError("Enter the M-Pesa number, starting with 254.");
       return;
     }
-    const digits = normalizePhoneDigits(phone, currency);
-    if (digits.length < 11) {
-      setError("Enter the M-Pesa number, starting with 254.");
+    const minor = kesCharge?.amount_minor;
+    if (!minor) {
+      setError("Enter the goods value in Kenyan shillings.");
       return;
     }
     setBusy(true);
     try {
-      await collect(token, digits, selected.code);
+      if (!activeToken) {
+        const started = await checkoutMpesa(digits, minor);
+        if (kesGoods?.amount_minor) sessionStorage.setItem("vukapay-received-amount", kesGoods.amount_minor);
+        else sessionStorage.setItem("vukapay-received-amount", minor);
+        setActiveToken(started.token);
+        setPhase("prompt");
+        return;
+      }
+      await collect(activeToken, digits, "MPESA");
       setPhase("prompt");
     } catch (reason: unknown) {
-      if (reason instanceof ApiError && reason.code === "QUOTE_EXPIRED") {
+      if (activeToken && reason instanceof ApiError && reason.code === "QUOTE_EXPIRED") {
         try {
-          setQuote(await refreshQuote(token));
+          setQuote(await refreshQuote(activeToken));
         } catch {
           setError("The price expired.");
         }
-      } else if (phase === "failed") {
+      } else if (activeToken && phase === "failed") {
         try {
-          await retryCollection(token);
+          await retryCollection(activeToken);
           setPhase("prompt");
         } catch (retry: unknown) {
           setError(retry instanceof Error ? retry.message : "Could not resend the M-Pesa prompt");
@@ -153,7 +209,8 @@ export function PayBoard({
     );
   }
 
-  const action = phase === "prompt" ? "Approve the M-Pesa prompt…" : phase === "failed" ? "Resend M-Pesa prompt" : "Pay with M-Pesa";
+  const action =
+    phase === "prompt" ? "Approve the M-Pesa prompt…" : phase === "failed" ? "Resend M-Pesa prompt" : autoStart && busy ? "Sending the M-Pesa prompt…" : "Pay with M-Pesa";
 
   return (
     <CloneBoard

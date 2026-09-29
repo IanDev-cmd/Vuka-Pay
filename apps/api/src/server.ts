@@ -267,6 +267,15 @@ export async function buildServer(deps: ServerDeps) {
       return svc().refreshBuyerQuote(token, currency === "KES" ? [] : await loadObservations(currency));
     }),
   );
+  app.post("/v1/checkout/mpesa", async (request, reply) =>
+    idempotent(request, reply, "checkout", () => {
+      const body = request.body as { phone?: string; amount_minor?: string };
+      if (typeof body.phone !== "string" || typeof body.amount_minor !== "string" || !/^\d+$/.test(body.amount_minor)) {
+        throw new DomainError("VALIDATION_FAILED", "Phone and Kenyan shilling amount are required", 422);
+      }
+      return svc().checkoutMpesa({ phone: body.phone, amountMinor: BigInt(body.amount_minor) });
+    }),
+  );
   app.post("/v1/pay/:token/collect", async (request, reply) =>
     idempotent(request, reply, "buyer", () => {
       const body = request.body as { phone: string; network_code: string };
