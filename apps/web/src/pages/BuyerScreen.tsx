@@ -12,7 +12,7 @@ import { QuoteCard, Rows, type CardFace } from "../components/QuoteCard";
 import { PhoneSheet } from "../components/PhoneSheet";
 import { placeholderQuote } from "../example";
 import { countdownLabel, formatMoney, formatRate, heldUntilClock } from "../format";
-import { CORRIDOR_NETWORKS, countryForCurrency } from "../networks";
+import { CORRIDOR_NETWORKS } from "../networks";
 import type { BuyerQuote, NetworkOption, PayStatus } from "../types";
 
 const FUNDED = new Set(["FUNDED", "SHIPPED", "DELIVERY_CLAIMED", "DISPUTED", "RELEASE_PENDING", "PAYOUT_FAILED", "PAID_OUT"]);
@@ -44,6 +44,7 @@ export function BuyerScreen({
   const [now, setNow] = useState(() => Date.now());
   const [tab, setTab] = useState("pay");
   const [paymentFailed, setPaymentFailed] = useState(false);
+  const [payerPhone, setPayerPhone] = useState<string | null>(null);
 
   useEffect(() => {
     const timer = window.setInterval(() => setNow(Date.now()), 250);
@@ -57,7 +58,8 @@ export function BuyerScreen({
       .then((next) => {
         if (cancelled) return;
         setQuote(next);
-        const first = (next.networks[0] ?? CORRIDOR_NETWORKS[next.collection_currency][0])?.display_name;
+        const mpesa = next.networks.find((row) => row.code === "MPESA");
+        const first = (next.collection_currency === "KES" ? mpesa ?? CORRIDOR_NETWORKS.KES[0] : next.networks[0] ?? CORRIDOR_NETWORKS[next.collection_currency][0])?.display_name;
         if (first) setNetworkName(first);
       })
       .catch((reason: unknown) => {
@@ -111,7 +113,7 @@ export function BuyerScreen({
   const networks = useMemo(() => networksFor(quote), [quote]);
   const selected = networks.find((row) => row.display_name === networkName) ?? networks[0];
   const currency = quote?.collection_currency ?? "UGX";
-  const flag = currency === "TZS" ? "TZ" : currency === "RWF" ? "RW" : "UG";
+  const flag = currency === "KES" ? "KE" : currency === "TZS" ? "TZ" : currency === "RWF" ? "RW" : "UG";
 
   const top: CardFace = {
     label: "You pay",
@@ -131,7 +133,7 @@ export function BuyerScreen({
   const bottom: CardFace = {
     label: "Exporter receives",
     amount: quote ? formatMoney(quote.exporter_receives, true) : "—",
-    pill: { kind: "static", flag: "KE", label: "KES · M-Pesa" },
+    pill: { kind: "static", flag: "KE", label: currency === "KES" ? "KES · held" : "KES · M-Pesa" },
     subline: quote ? `Invoice #${quote.invoice_number} · ${party?.display_name || quote.exporter_name}` : "",
     sublineAvatar: party ?? undefined,
     meta: "Paid out on verified delivery",
@@ -140,9 +142,13 @@ export function BuyerScreen({
   const rateText = `1 KES = ${quote?.rate ? formatRate(quote.rate) : "—"} ${currency} · Fees included`;
   const actionLabel =
     phase === "prompt"
-      ? "Approve on your phone…"
+      ? selected?.code === "MPESA"
+        ? "Approve the M-Pesa prompt…"
+        : "Approve on your phone…"
       : phase === "received"
-        ? "Payment received. Funds held until delivery."
+        ? status?.in_hold
+          ? `Payment received. ${formatMoney(status.in_hold, true)} is in the wallet hold.`
+          : "Payment received. Funds held until delivery."
         : phase === "expired"
           ? "Price expired. Get new price"
           : `Pay with ${selected?.display_name ?? "MTN MoMo"}`;
@@ -159,7 +165,8 @@ export function BuyerScreen({
       }
       try {
         if (paymentFailed && !quoteExpired) {
-          await retryCollection(token);
+          if (payerPhone && selected?.code) await collect(token, payerPhone, selected.code);
+          else await retryCollection(token);
           setPhase("prompt");
         } else {
           const next = await refreshQuote(token);
@@ -177,6 +184,10 @@ export function BuyerScreen({
 
   async function onConfirm(phone: string) {
     setSheet(false);
+    if (selected?.code === "MPESA" && currency !== "KES") {
+      setError("M-Pesa collects Kenyan shillings. Choose KES as the buyer currency.");
+      return;
+    }
     if (!token) {
       setError("This screen is the quote layout. Open the buyer link to start the mobile-money prompt.");
       return;
@@ -186,6 +197,7 @@ export function BuyerScreen({
       return;
     }
     try {
+      setPayerPhone(phone);
       await collect(token, phone, selected.code);
       setPhase("prompt");
       setError(null);
@@ -236,7 +248,7 @@ export function BuyerScreen({
       {sheet && selected ? (
         <PhoneSheet
           title={`Enter your ${selected.display_name} number`}
-          hint={`${countryForCurrency(currency) === "UG" ? "Uganda" : "Tanzania"} · ${prefixHint(currency)}`}
+          hint={`${countryName(currency)} · ${prefixHint(currency)}`}
           currency={currency}
           flag={flag}
           networks={networks}
@@ -252,11 +264,20 @@ export function BuyerScreen({
 }
 
 function networksFor(quote: BuyerQuote | null): NetworkOption[] {
+  if (quote?.collection_currency === "KES") return CORRIDOR_NETWORKS.KES;
   if (quote && quote.networks.length > 0) return quote.networks;
   return CORRIDOR_NETWORKS[quote?.collection_currency ?? "UGX"];
 }
 
-function prefixHint(currency: "UGX" | "TZS" | "RWF"): string {
+function countryName(currency: "KES" | "UGX" | "TZS" | "RWF"): string {
+  if (currency === "KES") return "Kenya";
+  if (currency === "TZS") return "Tanzania";
+  if (currency === "RWF") return "Rwanda";
+  return "Uganda";
+}
+
+function prefixHint(currency: "KES" | "UGX" | "TZS" | "RWF"): string {
+  if (currency === "KES") return "numbers start with 254";
   if (currency === "TZS") return "numbers start with 255";
   if (currency === "RWF") return "numbers start with 250";
   return "numbers start with 256";

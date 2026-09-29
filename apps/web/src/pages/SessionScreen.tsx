@@ -16,7 +16,7 @@ type DisputeHours = 24 | 48 | 72;
 
 interface SessionModel {
   state: string;
-  corridor: "KE-UG" | "KE-TZ" | "KE-RW";
+  corridor: "KE-KE" | "KE-UG" | "KE-TZ" | "KE-RW";
   tradeId: string | null;
   nfcToken: string | null;
   goods: Money;
@@ -134,6 +134,11 @@ export function SessionScreen({
     }
     const currency = collectionCurrency(model.corridor);
     const network = CORRIDOR_NETWORKS[currency][0];
+    if (network?.code === "MPESA" && currency !== "KES") {
+      setSheet(null);
+      setError("M-Pesa collects Kenyan shillings. Choose KES as the buyer currency.");
+      return;
+    }
     if (!network?.code) {
       setSheet(null);
       setError("This network has no Payaza code from the corridor list yet.");
@@ -376,7 +381,7 @@ export function SessionScreen({
           title="Send invoice"
           hint="Buyer name and mobile-money number."
           currency={collectionCurrency(model.corridor)}
-          flag={collectionCurrency(model.corridor) === "TZS" ? "TZ" : collectionCurrency(model.corridor) === "RWF" ? "RW" : "UG"}
+          flag={collectionCurrency(model.corridor) === "KES" ? "KE" : collectionCurrency(model.corridor) === "TZS" ? "TZ" : collectionCurrency(model.corridor) === "RWF" ? "RW" : "UG"}
           networks={CORRIDOR_NETWORKS[collectionCurrency(model.corridor)]}
           networkId={CORRIDOR_NETWORKS[collectionCurrency(model.corridor)][0]?.display_name ?? ""}
           onNetwork={() => undefined}
@@ -445,13 +450,15 @@ function placeholderSession(viewer: Viewer): SessionModel {
   };
 }
 
-function collectionCurrency(corridor: string): "UGX" | "TZS" | "RWF" {
+function collectionCurrency(corridor: string): "KES" | "UGX" | "TZS" | "RWF" {
+  if (corridor === "KE-KE") return "KES";
   if (corridor === "KE-TZ") return "TZS";
   if (corridor === "KE-RW") return "RWF";
   return "UGX";
 }
 
 function corridorLabel(corridor: string): string {
+  if (corridor === "KE-KE") return "Kenya · M-Pesa";
   if (corridor === "KE-TZ") return "Kenya → Tanzania";
   if (corridor === "KE-RW") return "Kenya → Rwanda";
   return "Kenya → Uganda";
@@ -474,7 +481,7 @@ function sessionFromApi(body: unknown, viewer: Viewer, fallback: SessionModel): 
     goods,
     vukapayFee: fee,
     exporterNet: net,
-    buyerAmount: buyer.currency === "UGX" || buyer.currency === "TZS" || buyer.currency === "RWF" ? buyer : fallback.buyerAmount,
+    buyerAmount: buyer.currency === "KES" || buyer.currency === "UGX" || buyer.currency === "TZS" || buyer.currency === "RWF" ? buyer : fallback.buyerAmount,
     tradeId: typeof row.id === "string" ? row.id : fallback.tradeId,
     nfcToken: typeof row.nfc_token === "string" ? row.nfc_token : null,
     payazaLabel: typeof fees.payaza_processing === "string" ? "Recorded on settlement" : fallback.payazaLabel,
@@ -489,7 +496,10 @@ function sessionFromApi(body: unknown, viewer: Viewer, fallback: SessionModel): 
       exporter: partyOf(parties.exporter, fallback.parties.exporter),
       buyer: partyOf(parties.buyer, fallback.parties.buyer),
     },
-    corridor: row.corridor === "KE-TZ" ? "KE-TZ" : row.corridor === "KE-RW" ? "KE-RW" : row.corridor === "KE-UG" ? "KE-UG" : fallback.corridor,
+    corridor:
+      row.corridor === "KE-KE" || row.corridor === "KE-TZ" || row.corridor === "KE-RW" || row.corridor === "KE-UG"
+        ? row.corridor
+        : fallback.corridor,
   };
 }
 

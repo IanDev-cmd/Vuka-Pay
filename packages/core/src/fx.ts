@@ -114,6 +114,27 @@ export function issueQuote(input: {
   };
 }
 
+/** Same-currency Kenya collection. The buyer pays the KES goods amount. No FX source is required. */
+export function issueKesQuote(input: { itemsMinor: bigint; config: QuoteConfig; now: Date }): FxQuote {
+  if (input.itemsMinor <= 0n) {
+    throw new DomainError("VALIDATION_FAILED", "Invoice total must be positive", 422);
+  }
+  const fees = feeBreakdown(input.itemsMinor, input.config.fee);
+  return {
+    from: "KES",
+    to: "KES",
+    midRate: "1",
+    spreadBps: 0,
+    feeMinor: fees.vukapayFeeMinor,
+    itemsMinor: input.itemsMinor,
+    buyerAmountMinor: input.itemsMinor,
+    exporterNetKesMinor: fees.exporterNetMinor,
+    expiresAt: new Date(input.now.getTime() + input.config.ttlSeconds * 1000),
+    sources: ["kes-identity"],
+    fxClearingDust: "0/1",
+  };
+}
+
 export function assertQuoteLive(expiresAt: Date, now: Date): void {
   if (now.getTime() >= expiresAt.getTime()) {
     throw new DomainError("QUOTE_EXPIRED", "The locked quote has expired", 409);

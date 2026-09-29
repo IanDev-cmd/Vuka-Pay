@@ -13,6 +13,7 @@ import {
   type Repository,
 } from "@vukapay/core";
 import { verifyWebhookSignature } from "@vukapay/payaza";
+import { readStkCallback } from "./mpesa.js";
 import { corridorCatalog, currencyCatalog, type AppConfig } from "./config.js";
 import { loadObservations } from "./rates.js";
 
@@ -173,12 +174,12 @@ export async function buildServer(deps: ServerDeps) {
     idempotent(request, reply, auth(request).sub, async () => {
       const body = request.body as {
         items: { description: string; quantity: number; unit_amount_minor: string }[];
-        buyer: { name: string; phone: string; country: "UG" | "TZ" | "RW"; network?: string; currency: "UGX" | "TZS" | "RWF" };
+        buyer: { name: string; phone: string; country: "KE" | "UG" | "TZ" | "RW"; network?: string; currency: "KES" | "UGX" | "TZS" | "RWF" };
         notes?: string;
         shipping_deadline?: string;
         dispute_window_hours?: number;
       };
-      const observations = await loadObservations(body.buyer.currency);
+      const observations = body.buyer.currency === "KES" ? [] : await loadObservations(body.buyer.currency);
       return svc().createInvoice(auth(request).sub, {
         items: body.items.map((item) => ({ description: item.description, quantity: item.quantity, unitMinor: BigInt(item.unit_amount_minor) })),
         buyer: body.buyer,
@@ -229,7 +230,7 @@ export async function buildServer(deps: ServerDeps) {
     const trades = await repo().trades({ businessId: business.id });
     const hold = trades
       .filter((trade) => ["FUNDED", "SHIPPED", "DELIVERY_CLAIMED", "DISPUTED", "RELEASE_PENDING", "PAYOUT_FAILED"].includes(trade.state))
-      .reduce((sum, trade) => sum + trade.exporterNetMinor, 0n);
+      .reduce((sum, trade) => sum + (trade.buyerCurrency === "KES" ? trade.heldBuyerMinor : trade.exporterNetMinor), 0n);
     const paid = trades.filter((trade) => trade.state === "PAID_OUT").reduce((sum, trade) => sum + trade.exporterNetMinor, 0n);
     const pending = trades.filter((trade) => trade.state === "RELEASE_PENDING").reduce((sum, trade) => sum + trade.exporterNetMinor, 0n);
     return {
@@ -260,10 +261,10 @@ export async function buildServer(deps: ServerDeps) {
       const token = (request.params as { token: string }).token;
       const view = await svc().buyerView(token);
       const currency = view.buyer_amount.currency;
-      if (currency !== "UGX" && currency !== "TZS" && currency !== "RWF") {
+      if (currency !== "KES" && currency !== "UGX" && currency !== "TZS" && currency !== "RWF") {
         throw new DomainError("VALIDATION_FAILED", "This pay link is not an EAC collection currency", 422);
       }
-      return svc().refreshBuyerQuote(token, await loadObservations(currency));
+      return svc().refreshBuyerQuote(token, currency === "KES" ? [] : await loadObservations(currency));
     }),
   );
   app.post("/v1/pay/:token/collect", async (request, reply) =>
@@ -272,7 +273,11 @@ export async function buildServer(deps: ServerDeps) {
       return svc().collect((request.params as { token: string }).token, { phone: body.phone, networkCode: body.network_code });
     }),
   );
-  app.get("/v1/pay/:token/status", async (request) => svc().buyerView((request.params as { token: string }).token));
+  app.get("/v1/pay/:token/status", async (request) => {
+    const token = (request.params as { token: string }).token;
+    await svc().syncMpesa(token).catch(() => undefined);
+    return svc().buyerView(token);
+  });
   app.get("/v1/pay/:token/stream", async (request, reply) => stream(reply, await svc().buyerView((request.params as { token: string }).token)));
   app.post("/v1/pay/:token/retry", async (request, reply) =>
     idempotent(request, reply, "buyer", () => {
@@ -497,6 +502,18 @@ export async function buildServer(deps: ServerDeps) {
       return rails.fundTest(body.transaction_reference, body.country_code);
     }),
   );
+
+  app.post("/api/webhooks/mpesa/stk", async (request) => {
+    const parsed = readStkCallback(request.body);
+    if (parsed && deps.service) {
+      try {
+        await deps.service.applyMpesaResult(parsed);
+      } catch (error) {
+        request.log.error({ err: error }, "mpesa stk callback");
+      }
+    }
+    return { ResultCode: 0, ResultDesc: "Accepted" };
+  });
 
   await app.register(async (scope) => {
     scope.removeContentTypeParser("application/json");

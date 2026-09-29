@@ -22,6 +22,8 @@ describe("payaza webhook route", () => {
         async kesAccount() { return null; },
         async kesMobileMoneyCode() { return "X"; },
         async fundTest() { return { response_code: "00" }; },
+        async stkPush() { return { checkoutRequestId: "ws_test", merchantRequestId: "m" }; },
+        async stkQuery() { return { pending: true }; },
       },
       notifier: { async sms() { throw new Error("no"); } },
       config: {

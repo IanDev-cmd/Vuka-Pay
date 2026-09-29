@@ -318,6 +318,13 @@ export interface Rails {
   kesAccount(): Promise<{ payazaAccountReference: string; postNoDebit: boolean; accountBalance: number; currency: string } | null>;
   kesMobileMoneyCode(pinned: string | undefined): Promise<string>;
   fundTest(reference: string, countryCode: string): Promise<{ response_code: string; response_message?: string }>;
+  stkPush(input: {
+    phone: string;
+    amount: number;
+    accountReference: string;
+    description: string;
+  }): Promise<{ checkoutRequestId: string; merchantRequestId: string; customerMessage?: string }>;
+  stkQuery(checkoutRequestId: string): Promise<{ pending: boolean; resultCode?: string; amount?: number; receipt?: string }>;
 }
 
 export interface Notifier {

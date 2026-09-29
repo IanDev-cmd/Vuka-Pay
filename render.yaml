@@ -36,6 +36,16 @@ services:
         sync: false
       - key: PAYAZA_KES_MOMO_BANK_CODE
         sync: false
+      - key: MPESA_CONSUMER_KEY
+        sync: false
+      - key: MPESA_CONSUMER_SECRET
+        sync: false
+      - key: MPESA_SHORTCODE
+        sync: false
+      - key: MPESA_PASSKEY
+        sync: false
+      - key: MPESA_BASE_URL
+        value: https://sandbox.safaricom.co.ke
       - key: FEE_BPS
         value: "150"
       - key: FX_SPREAD_BPS

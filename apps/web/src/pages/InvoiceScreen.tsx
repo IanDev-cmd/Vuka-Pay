@@ -16,7 +16,7 @@ const TABS = [
 export function InvoiceScreen({ initialTab = "invoice" }: { initialTab?: "invoice" | "trades" | "payouts" }) {
   const [tab, setTab] = useState(initialTab);
   const [amount, setAmount] = useState("45,000");
-  const [currency, setCurrency] = useState<"UGX" | "TZS" | "RWF">("UGX");
+  const [currency, setCurrency] = useState<"KES" | "UGX" | "TZS" | "RWF">("UGX");
   const [live, setLive] = useState<BuyerQuote | null>(null);
   const [corridors, setCorridors] = useState<CorridorMeta[]>([]);
   const [networkName, setNetworkName] = useState("MTN MoMo");
@@ -29,7 +29,14 @@ export function InvoiceScreen({ initialTab = "invoice" }: { initialTab?: "invoic
   const [listError, setListError] = useState<string | null>(null);
 
   const [example] = useState(() => placeholderQuote());
-  const shown = live && live.collection_currency === currency ? live : currency === "UGX" && amount.replace(/,/g, "") === "45000" ? example : null;
+  const shown =
+    live && live.collection_currency === currency
+      ? live
+      : currency === "KES"
+        ? kesPreview(amount)
+        : currency === "UGX" && amount.replace(/,/g, "") === "45000"
+          ? example
+          : null;
   const quote = shown;
 
   useEffect(() => {
@@ -59,7 +66,7 @@ export function InvoiceScreen({ initialTab = "invoice" }: { initialTab?: "invoic
 
   const networks = networksFor(currency, corridors);
   const selected = networks.find((row) => row.display_name === networkName) ?? networks[0];
-  const flag = currency === "TZS" ? "TZ" : currency === "RWF" ? "RW" : "UG";
+  const flag = currency === "KES" ? "KE" : currency === "TZS" ? "TZ" : currency === "RWF" ? "RW" : "UG";
 
   const top: CardFace = {
     label: "Invoice amount",
@@ -76,12 +83,13 @@ export function InvoiceScreen({ initialTab = "invoice" }: { initialTab?: "invoic
       label: "Buyer pays in",
       selected: currency,
       options: [
+        { id: "KES", label: "KES", flag: "KE" },
         { id: "UGX", label: "UGX", flag: "UG" },
         { id: "TZS", label: "TZS", flag: "TZ" },
         { id: "RWF", label: "RWF", flag: "RW" },
       ],
       onSelect: (id) => {
-        if (id === "UGX" || id === "TZS" || id === "RWF") setCurrency(id);
+        if (id === "KES" || id === "UGX" || id === "TZS" || id === "RWF") setCurrency(id);
       },
     },
     subline: "",
@@ -96,7 +104,10 @@ export function InvoiceScreen({ initialTab = "invoice" }: { initialTab?: "invoic
     meta: "",
   };
 
-  const rateText = `1 KES = ${quote?.rate ? formatRate(quote.rate) : "—"} ${currency} · Fees included`;
+  const rateText =
+    currency === "KES"
+      ? "Paid in KES · M-Pesa prompt on the buyer's phone"
+      : `1 KES = ${quote?.rate ? formatRate(quote.rate) : "—"} ${currency} · Fees included`;
 
   async function onConfirm(phone: string) {
     const minor = majorToMinor(amount, "KES");
@@ -106,6 +117,11 @@ export function InvoiceScreen({ initialTab = "invoice" }: { initialTab?: "invoic
     }
     if (!buyerName.trim()) {
       setError("Enter the buyer name.");
+      return;
+    }
+    if (selected?.code === "MPESA" && currency !== "KES") {
+      setSheet(false);
+      setError("M-Pesa collects Kenyan shillings. Choose KES as the buyer currency.");
       return;
     }
     if (!selected?.code) {
@@ -208,10 +224,30 @@ export function InvoiceScreen({ initialTab = "invoice" }: { initialTab?: "invoic
   );
 }
 
-function networksFor(currency: "UGX" | "TZS" | "RWF", corridors: CorridorMeta[]): NetworkOption[] {
+function networksFor(currency: "KES" | "UGX" | "TZS" | "RWF", corridors: CorridorMeta[]): NetworkOption[] {
+  if (currency === "KES") return CORRIDOR_NETWORKS.KES;
   const fromApi = corridors.find((row) => row.currency === currency)?.networks ?? [];
   if (fromApi.length > 0) return fromApi;
   return CORRIDOR_NETWORKS[currency];
+}
+
+function kesPreview(amount: string): BuyerQuote | null {
+  const minor = majorToMinor(amount, "KES");
+  if (!minor || minor === "0") return null;
+  const goods = { amount_minor: minor, currency: "KES" as const };
+  return {
+    invoice_number: "",
+    exporter_name: "",
+    buyer_amount: goods,
+    exporter_receives: goods,
+    exporter_net: null,
+    fee_subline: null,
+    rate: "1",
+    expires_at: null,
+    collection_currency: "KES",
+    fees: { goods, vukapay_fee: null, payaza_processing_fee: null, spread_bps: 0 },
+    networks: CORRIDOR_NETWORKS.KES,
+  };
 }
 
 function kesGoods(amount: string): string {

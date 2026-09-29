@@ -23,6 +23,6 @@ export function placeholderQuote(now = Date.now()): BuyerQuote {
       payaza_processing_fee: null,
       spread_bps: null,
     },
-    networks: CORRIDOR_NETWORKS.UGX,
+    networks: [...CORRIDOR_NETWORKS.UGX],
   };
 }

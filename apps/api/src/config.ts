@@ -3,6 +3,7 @@ import {
   CORRIDORS,
   CURRENCY_META,
   DOCUMENTED_COLLECTION_NETWORKS,
+  MPESA_STK_NETWORK,
   EXPONENTS,
   type CollectionNetwork,
   type Currency,
@@ -44,6 +45,12 @@ const Env = z.object({
   PAYAZA_KES_MOMO_BANK_CODE: z.string().optional(),
   PUBLIC_APP_URL: z.string().default("http://localhost:3000"),
   DISPUTE_WINDOW_SECONDS: z.coerce.number().default(172800),
+  MPESA_CONSUMER_KEY: z.string().optional(),
+  MPESA_CONSUMER_SECRET: z.string().optional(),
+  MPESA_SHORTCODE: z.string().optional(),
+  MPESA_PASSKEY: z.string().optional(),
+  MPESA_BASE_URL: z.string().optional(),
+  MPESA_CALLBACK_URL: z.string().optional(),
 });
 
 export type AppConfig = z.infer<typeof Env> & {
@@ -58,7 +65,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
   return {
     ...parsed,
     settlementMode: parsed.FX_SETTLEMENT_MODE === "treasury_float" ? "treasury_float" : "none",
-    collectionNetworks: [...DOCUMENTED_COLLECTION_NETWORKS, ...extra],
+    collectionNetworks: [...DOCUMENTED_COLLECTION_NETWORKS, ...extra, MPESA_STK_NETWORK],
     smsConfigured: Boolean((parsed.AT_USERNAME && parsed.AT_API_KEY) || (parsed.TWILIO_ACCOUNT_SID && parsed.TWILIO_AUTH_TOKEN && parsed.TWILIO_FROM)),
   };
 }
@@ -100,7 +107,10 @@ export function corridorCatalog(networks: CollectionNetwork[]) {
     collection_currency: corridor.collectionCurrency,
     payout_currency: corridor.payoutCurrency,
     buyer_country: corridor.buyerCountry,
-    phone: { prefix: corridor.buyerCountry === "UG" ? "256" : "255", digits: 12 },
+    phone: {
+      prefix: corridor.buyerCountry === "KE" ? "254" : corridor.buyerCountry === "UG" ? "256" : corridor.buyerCountry === "RW" ? "250" : "255",
+      digits: 12,
+    },
     networks: networks
       .filter((row) => row.currency === corridor.collectionCurrency)
       .map((row) => ({ code: row.code, display_name: row.displayName })),

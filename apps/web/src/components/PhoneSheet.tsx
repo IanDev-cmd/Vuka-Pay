@@ -19,7 +19,7 @@ export function PhoneSheet({
 }: {
   title: string;
   hint: string;
-  currency: "UGX" | "TZS" | "RWF";
+  currency: "KES" | "UGX" | "TZS" | "RWF";
   flag: FlagCode;
   networks: NetworkOption[];
   networkId: string;
@@ -32,7 +32,7 @@ export function PhoneSheet({
   const fieldId = useId();
   const [raw, setRaw] = useState("");
   const [error, setError] = useState<string | null>(null);
-  const prefix = currency === "UGX" ? "256" : "255";
+  const prefix = currency === "KES" ? "254" : currency === "UGX" ? "256" : currency === "TZS" ? "255" : "250";
 
   useEffect(() => {
     function onKey(event: KeyboardEvent) {

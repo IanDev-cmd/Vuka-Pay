@@ -1,8 +1,22 @@
 import { DomainError, type Notifier, type Rails } from "@vukapay/core";
 import { PayazaClient } from "@vukapay/payaza";
 import type { AppConfig } from "./config.js";
+import { MpesaStk, mpesaFromEnv } from "./mpesa.js";
 
 export function createRails(config: AppConfig, log: (event: Record<string, unknown>) => void): Rails {
+  const mpesaConfig = mpesaFromEnv(
+    {
+      MPESA_CONSUMER_KEY: config.MPESA_CONSUMER_KEY,
+      MPESA_CONSUMER_SECRET: config.MPESA_CONSUMER_SECRET,
+      MPESA_SHORTCODE: config.MPESA_SHORTCODE,
+      MPESA_PASSKEY: config.MPESA_PASSKEY,
+      MPESA_BASE_URL: config.MPESA_BASE_URL,
+      MPESA_CALLBACK_URL: config.MPESA_CALLBACK_URL,
+      RENDER_EXTERNAL_URL: process.env.RENDER_EXTERNAL_URL,
+    },
+    config.PUBLIC_APP_URL,
+  );
+  const mpesa = mpesaConfig ? new MpesaStk(mpesaConfig) : null;
   const client = config.PAYAZA_PUBLIC_KEY
     ? new PayazaClient({
         baseUrl: config.PAYAZA_BASE_URL,
@@ -101,6 +115,14 @@ export function createRails(config: AppConfig, log: (event: Record<string, unkno
         throw new DomainError("CAPABILITY_GATED", "Test account funding is refused on the live tenant", 409);
       }
       return requireClient().collections.fundTestCollection(reference, countryCode);
+    },
+    async stkPush(input) {
+      if (!mpesa) throw new DomainError("CAPABILITY_GATED", "M-Pesa STK is not configured", 409);
+      return mpesa.push(input);
+    },
+    async stkQuery(checkoutRequestId) {
+      if (!mpesa) throw new DomainError("CAPABILITY_GATED", "M-Pesa STK is not configured", 409);
+      return mpesa.query(checkoutRequestId);
     },
   };
 }

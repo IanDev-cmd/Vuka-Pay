@@ -32,6 +32,12 @@ function rails(status: string): Rails & { payouts: unknown[] } {
     async fundTest() {
       return { response_code: "00", response_message: "Account Successfully Funded" };
     },
+    async stkPush() {
+      return { checkoutRequestId: "ws_test", merchantRequestId: "m", customerMessage: "ok" };
+    },
+    async stkQuery() {
+      return { pending: true };
+    },
   };
 }
 

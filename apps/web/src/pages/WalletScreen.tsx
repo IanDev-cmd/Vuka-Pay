@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ApiError, getBalance, listPayouts, type PayoutListItem, type WalletBalance } from "../api";
 import { formatMoney } from "../format";
 import { navigate } from "../nav";
@@ -19,23 +19,37 @@ export function WalletScreen() {
   const [balance, setBalance] = useState<WalletBalance>(EMPTY_BALANCE);
   const [payouts, setPayouts] = useState<PayoutListItem[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [receivedNote, setReceivedNote] = useState<string | null>(null);
   const [selectedId, setSelectedId] = useState("in_hold");
+  const previousHold = useRef<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
-    Promise.all([getBalance(), listPayouts()])
-      .then(([nextBalance, nextPayouts]) => {
+    async function load() {
+      try {
+        const [nextBalance, nextPayouts] = await Promise.all([getBalance(), listPayouts()]);
         if (cancelled) return;
+        const nextHold = nextBalance.in_hold?.amount_minor ?? "0";
+        const prior = previousHold.current;
+        if (prior !== null && BigInt(nextHold) > BigInt(prior) && nextBalance.in_hold) {
+          setReceivedNote(`M-Pesa payment received. ${formatMoney(nextBalance.in_hold, true)} is in hold.`);
+          setSelectedId("in_hold");
+        }
+        previousHold.current = nextHold;
         setBalance(nextBalance);
         setPayouts(nextPayouts);
-      })
-      .catch((reason: unknown) => {
+        setError(null);
+      } catch (reason: unknown) {
         if (cancelled) return;
         const message = reason instanceof ApiError && reason.status < 500 ? reason.message : "Could not load the wallet";
         setError(message);
-      });
+      }
+    }
+    void load();
+    const timer = window.setInterval(() => void load(), 4000);
     return () => {
       cancelled = true;
+      window.clearInterval(timer);
     };
   }, []);
 
@@ -47,6 +61,7 @@ export function WalletScreen() {
       <div className="wallet-shell">
         <h1 className="wallet-title">Wallet</h1>
         <p className="wallet-sub">We hold your money safely until the goods arrive.</p>
+        {receivedNote ? <p className="wallet-sub">{receivedNote}</p> : null}
         {error ? <p className="wallet-error">{error}</p> : null}
 
         <div className="wallet-grid">

@@ -75,7 +75,7 @@ export async function getPay(token: string): Promise<BuyerQuote> {
   const fees = isRecord(quote.fee_breakdown) ? quote.fee_breakdown : isRecord(quote.fees) ? quote.fees : {};
   const collection = quote.buyer_amount ?? body.buyer_amount;
   const buyer = requireMoney(collection, "buyer_amount");
-  if (buyer.currency !== "UGX" && buyer.currency !== "TZS" && buyer.currency !== "RWF") {
+  if (buyer.currency !== "KES" && buyer.currency !== "UGX" && buyer.currency !== "TZS" && buyer.currency !== "RWF") {
     throw new ApiError("VALIDATION_FAILED", "Buyer currency is not an EAC collection currency", 422);
   }
   const goods = money(fees.items) ?? money(fees.goods) ?? money(quote.kes_total) ?? money(body.kes_total);
@@ -168,17 +168,17 @@ export async function retryCollection(token: string): Promise<void> {
 
 export async function getPayStatus(token: string): Promise<PayStatus> {
   const body = await request<unknown>(`/v1/pay/${encodeURIComponent(token)}/status`);
-  if (!isRecord(body)) return { collection_status: null, trade_state: null };
+  if (!isRecord(body)) return { collection_status: null, trade_state: null, in_hold: null };
   const collection = isRecord(body.collection) ? body.collection : body;
   const trade = isRecord(body.trade) ? body.trade : body;
   const rawStatus = typeof collection.status === "string" ? collection.status : null;
   const collection_status = COLLECTION.includes(rawStatus as CollectionStatus) ? (rawStatus as CollectionStatus) : null;
   const trade_state = typeof trade.state === "string" ? trade.state : typeof body.trade_state === "string" ? body.trade_state : null;
-  return { collection_status, trade_state };
+  return { collection_status, trade_state, in_hold: money(body.held_buyer_amount) };
 }
 
 export interface CorridorMeta {
-  currency: "UGX" | "TZS" | "RWF";
+  currency: "KES" | "UGX" | "TZS" | "RWF";
   networks: NetworkOption[];
 }
 
@@ -189,7 +189,7 @@ export async function getCorridors(): Promise<CorridorMeta[]> {
   for (const row of rows) {
     if (!isRecord(row)) continue;
     const currency = row.collection_currency ?? row.currency;
-    if (currency !== "UGX" && currency !== "TZS" && currency !== "RWF") continue;
+    if (currency !== "KES" && currency !== "UGX" && currency !== "TZS" && currency !== "RWF") continue;
     corridors.push({ currency, networks: readNetworks(row.networks) });
   }
   return corridors;
@@ -197,7 +197,7 @@ export async function getCorridors(): Promise<CorridorMeta[]> {
 
 export interface InvoiceDraft {
   items: { description: string; quantity: number; unit: Money }[];
-  buyer: { name: string; phone: string; country: "UG" | "TZ" | "RW"; network: string; currency: "UGX" | "TZS" | "RWF" };
+  buyer: { name: string; phone: string; country: "KE" | "UG" | "TZ" | "RW"; network: string; currency: "KES" | "UGX" | "TZS" | "RWF" };
   notes?: string;
   shipping_deadline?: string;
   dispute_window_hours?: number;
@@ -232,7 +232,7 @@ export async function createInvoice(draft: InvoiceDraft): Promise<{ id: string; 
 
 function quoteFromInvoice(body: Record<string, unknown>): BuyerQuote {
   const buyer = requireMoney(body.buyer_amount, "buyer_amount");
-  if (buyer.currency !== "UGX" && buyer.currency !== "TZS" && buyer.currency !== "RWF") {
+  if (buyer.currency !== "KES" && buyer.currency !== "UGX" && buyer.currency !== "TZS" && buyer.currency !== "RWF") {
     throw new ApiError("VALIDATION_FAILED", "Buyer currency is not an EAC collection currency", 422);
   }
   const goods = requireMoney(body.kes_total ?? body.items_total, "kes_total");

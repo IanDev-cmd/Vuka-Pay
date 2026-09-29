@@ -5,7 +5,7 @@ import { hashPassword, verifyPassword, signJwt, verifyJwt, signTradeToken, readT
 import { normalizePhone, payoutNarration } from "../phone.js";
 import { payazaNumberToMinor, type Currency } from "../money.js";
 import { minorToPayazaNumber } from "../money.js";
-import { issueQuote, assertQuoteLive, assertSettlementAvailable, assertExposureAllows, assertTreasuryEvidence, type RateObservation } from "../fx.js";
+import { issueQuote, issueKesQuote, assertQuoteLive, assertSettlementAvailable, assertExposureAllows, assertTreasuryEvidence, type RateObservation } from "../fx.js";
 import { transition, type TradeCommand, type PayoutIntent } from "../escrow.js";
 import { decideCollection } from "../collectionDecision.js";
 import {
@@ -267,7 +267,7 @@ export class VukaService {
 
   async createInvoice(userId: string, input: {
     items: { description: string; quantity: number; unitMinor: bigint }[];
-    buyer: { name: string; phone: string; country: "UG" | "TZ" | "RW"; network?: string; currency: "UGX" | "TZS" | "RWF" };
+    buyer: { name: string; phone: string; country: "KE" | "UG" | "TZ" | "RW"; network?: string; currency: "KES" | "UGX" | "TZS" | "RWF" };
     notes?: string;
     shippingDeadline?: string;
     disputeWindowHours?: number;
@@ -297,30 +297,36 @@ export class VukaService {
     const day = this.now().toISOString().slice(0, 10);
     const fingerprint = sha256Hex(`${business.id}|${phone}|${itemsMinor}|${day}`);
     duplicateInvoice({ existingFingerprints: await this.deps.repo.fingerprints(business.id), fingerprint });
-    this.assertSettlementForNewTrade();
-    const exposure = openExposureKes(await this.asBalances());
-    const quote = issueQuote({
-      itemsMinor,
-      to: input.buyer.currency,
-      observations: input.observations,
-      now: this.now(),
-      config: {
-        spreadBps: this.deps.config.spreadBps,
-        ttlSeconds: this.deps.config.quoteTtlSeconds,
-        maxDeviationBps: this.deps.config.maxDeviationBps,
-        maxRateAgeSeconds: this.deps.config.maxRateAgeSeconds,
-        fee: {
-          bps: this.deps.config.feeBps,
-          minMinor: this.deps.config.feeMinMinor,
-          maxMinor: this.deps.config.feeMaxMinor,
-        },
+    const quoteConfig = {
+      spreadBps: this.deps.config.spreadBps,
+      ttlSeconds: this.deps.config.quoteTtlSeconds,
+      maxDeviationBps: this.deps.config.maxDeviationBps,
+      maxRateAgeSeconds: this.deps.config.maxRateAgeSeconds,
+      fee: {
+        bps: this.deps.config.feeBps,
+        minMinor: this.deps.config.feeMinMinor,
+        maxMinor: this.deps.config.feeMaxMinor,
       },
-    });
-    assertExposureAllows({
-      openExposureMinor: exposure,
-      additionalMinor: quote.exporterNetKesMinor + quote.feeMinor,
-      maxOpenExposureMinor: this.deps.config.maxOpenExposureMinor,
-    });
+    };
+    const quote =
+      input.buyer.currency === "KES"
+        ? issueKesQuote({ itemsMinor, config: quoteConfig, now: this.now() })
+        : issueQuote({
+            itemsMinor,
+            to: input.buyer.currency,
+            observations: input.observations,
+            now: this.now(),
+            config: quoteConfig,
+          });
+    if (input.buyer.currency !== "KES") {
+      this.assertSettlementForNewTrade();
+      const exposure = openExposureKes(await this.asBalances());
+      assertExposureAllows({
+        openExposureMinor: exposure,
+        additionalMinor: quote.exporterNetKesMinor + quote.feeMinor,
+        maxOpenExposureMinor: this.deps.config.maxOpenExposureMinor,
+      });
+    }
     const invoice: InvoiceRecord = {
       id: newId("inv"),
       businessId: business.id,
@@ -467,19 +473,23 @@ export class VukaService {
     if (trade.state !== "INVOICED" && trade.state !== "AWAITING_PAYMENT" && trade.state !== "EXPIRED" && trade.state !== "PAYMENT_FAILED") {
       throw new DomainError("CONFLICT", "Quote can no longer be refreshed", 409);
     }
-    const quote = issueQuote({
-      itemsMinor: trade.itemsMinor,
-      to: trade.buyerCurrency === "TZS" ? "TZS" : "UGX",
-      observations,
-      now: this.now(),
-      config: {
-        spreadBps: this.deps.config.spreadBps,
-        ttlSeconds: this.deps.config.quoteTtlSeconds,
-        maxDeviationBps: this.deps.config.maxDeviationBps,
-        maxRateAgeSeconds: this.deps.config.maxRateAgeSeconds,
-        fee: { bps: this.deps.config.feeBps, minMinor: this.deps.config.feeMinMinor, maxMinor: this.deps.config.feeMaxMinor },
-      },
-    });
+    const quoteConfig = {
+      spreadBps: this.deps.config.spreadBps,
+      ttlSeconds: this.deps.config.quoteTtlSeconds,
+      maxDeviationBps: this.deps.config.maxDeviationBps,
+      maxRateAgeSeconds: this.deps.config.maxRateAgeSeconds,
+      fee: { bps: this.deps.config.feeBps, minMinor: this.deps.config.feeMinMinor, maxMinor: this.deps.config.feeMaxMinor },
+    };
+    const quote =
+      trade.buyerCurrency === "KES"
+        ? issueKesQuote({ itemsMinor: trade.itemsMinor, config: quoteConfig, now: this.now() })
+        : issueQuote({
+            itemsMinor: trade.itemsMinor,
+            to: trade.buyerCurrency === "TZS" ? "TZS" : trade.buyerCurrency === "RWF" ? "RWF" : "UGX",
+            observations,
+            now: this.now(),
+            config: quoteConfig,
+          });
     trade.quotedBuyerMinor = quote.buyerAmountMinor;
     trade.exporterNetMinor = quote.exporterNetKesMinor;
     trade.feeMinor = quote.feeMinor;
@@ -536,6 +546,46 @@ export class VukaService {
       rawResponse: null,
     };
     await this.deps.repo.saveCollection(collection);
+    if (network.code === "MPESA") {
+      if (fresh.buyerCurrency !== "KES") {
+        throw new DomainError("VALIDATION_FAILED", "M-Pesa collects Kenyan shillings", 422);
+      }
+      try {
+        const pushed = await this.deps.rails.stkPush({
+          phone,
+          amount: minorToPayazaNumber(collection.amountMinor, "KES"),
+          accountReference: reference.replace(/[^A-Za-z0-9]/g, "").slice(-12),
+          description: "VukaPay",
+        });
+        collection.transactionReference = pushed.checkoutRequestId;
+        collection.status = "PENDING";
+        collection.rawResponse = pushed;
+        fresh.attemptCount += 1;
+        await this.deps.repo.saveCollection(collection);
+        if (fresh.state === "AWAITING_PAYMENT") await this.move(fresh, "PROMPT_SENT", "buyer", "mpesa prompt sent");
+        return {
+          collection_id: collection.id,
+          status: "PENDING" as const,
+          expires_at: fresh.quoteExpiresAt,
+          prompt_instructions: pushed.customerMessage ?? "Approve the M-Pesa prompt on your phone.",
+          payaza_checkout_url: null,
+          payment_qr: paymentQrText({
+            invoiceId: fresh.invoiceId,
+            tradeId: fresh.id,
+            payToken: token,
+            corridor: fresh.corridorId,
+            settlementCurrency: "KES",
+            amount: fresh.quotedBuyerMinor.toString(),
+            payazaCheckoutUrl: null,
+          }),
+        };
+      } catch (error) {
+        collection.status = "FAILED";
+        collection.rawResponse = { message: error instanceof Error ? error.message : "stk failed" };
+        await this.deps.repo.saveCollection(collection);
+        throw error;
+      }
+    }
     const [first, ...rest] = fresh.buyerName.split(" ");
     const response = await this.deps.rails.processCollection({
       amount: minorToPayazaNumber(collection.amountMinor, fresh.buyerCurrency),
@@ -656,6 +706,48 @@ export class VukaService {
         .catch(() => undefined);
     }
     return { applied: true, state: (await this.requireTrade(trade.id)).state };
+  }
+
+  async applyMpesaResult(input: { checkoutRequestId: string; resultCode: number; amount?: number; receipt?: string }) {
+    const collection = await this.deps.repo.collectionByReference(input.checkoutRequestId);
+    if (!collection) return { applied: false, reason: "unknown_reference" };
+    if (collection.status === "COMPLETED" || collection.status === "FAILED") return { applied: false, reason: "duplicate" };
+    if (input.resultCode !== 0) {
+      collection.status = "FAILED";
+      collection.rawResponse = input;
+      await this.deps.repo.saveCollection(collection);
+      const trade = await this.requireTrade(collection.tradeId);
+      if (trade.state === "PAYMENT_PENDING") await this.move(trade, "PAYMENT_FAILED", "mpesa", `stk ${input.resultCode}`);
+      return { applied: true, state: (await this.requireTrade(trade.id)).state };
+    }
+    const shillings = input.amount ?? minorToPayazaNumber(collection.amountMinor, "KES");
+    const receivedMinor = payazaNumberToMinor(shillings, "KES");
+    const trade = await this.requireTrade(collection.tradeId);
+    const validation = receivedMinor === trade.quotedBuyerMinor ? "EXACT" : receivedMinor < trade.quotedBuyerMinor ? "UNDERPAYMENT" : "OVERPAYMENT";
+    return this.applyCollectionWebhook({
+      transactionReference: collection.transactionReference,
+      transactionStatus: "Funds Received",
+      status: "Completed",
+      amountValidation: validation,
+      amountReceived: shillings,
+      transactionFee: 0,
+      currency: "KES",
+      dedupeKey: `mpesa:${input.checkoutRequestId}:${input.receipt ?? "ok"}`,
+    });
+  }
+
+  async syncMpesa(token: string) {
+    const { tradeId } = this.parseBuyer(token);
+    const pending = (await this.deps.repo.collections(tradeId)).find((row) => row.status === "PENDING" && row.networkCode === "MPESA");
+    if (!pending) return;
+    const query = await this.deps.rails.stkQuery(pending.transactionReference);
+    if (query.pending || !query.resultCode) return;
+    await this.applyMpesaResult({
+      checkoutRequestId: pending.transactionReference,
+      resultCode: Number(query.resultCode),
+      amount: query.amount,
+      receipt: query.receipt,
+    });
   }
 
   async ingestPayazaBody(rawBody: string) {
@@ -1221,6 +1313,9 @@ export class VukaService {
       mpesa_reference: paid?.transactionReference ?? null,
       nfc_token: nfcToken,
       available_actions: availableActions(trade.state, viewer),
+      networks: this.deps.config.collectionNetworks
+        .filter((row) => row.currency === trade.buyerCurrency)
+        .map((row) => ({ code: row.code, display_name: row.displayName })),
       parties: {
         exporter: {
           display_name: business?.tradingName ?? "",

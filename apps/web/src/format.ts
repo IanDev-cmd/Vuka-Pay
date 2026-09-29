@@ -61,8 +61,8 @@ export function heldUntilClock(expiresAt: string): string {
   });
 }
 
-export function normalizePhoneDigits(input: string, currency: "UGX" | "TZS" | "RWF"): string {
-  const prefix = currency === "UGX" ? "256" : currency === "TZS" ? "255" : "250";
+export function normalizePhoneDigits(input: string, currency: "KES" | "UGX" | "TZS" | "RWF"): string {
+  const prefix = currency === "KES" ? "254" : currency === "UGX" ? "256" : currency === "TZS" ? "255" : "250";
   let digits = input.replace(/\D/g, "");
   if (digits.startsWith(prefix)) digits = digits.slice(prefix.length);
   digits = digits.replace(/^0+/, "");

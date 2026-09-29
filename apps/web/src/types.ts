@@ -32,7 +32,7 @@ export interface BuyerQuote {
   /** Buyer-currency major units per 1 KES. */
   rate: string | null;
   expires_at: string | null;
-  collection_currency: "UGX" | "TZS" | "RWF";
+  collection_currency: "KES" | "UGX" | "TZS" | "RWF";
   fees: FeeLines;
   networks: NetworkOption[];
 }
@@ -42,4 +42,5 @@ export type CollectionStatus = "INITIATED" | "PENDING" | "COMPLETED" | "FAILED" 
 export interface PayStatus {
   collection_status: CollectionStatus | null;
   trade_state: string | null;
+  in_hold: Money | null;
 }

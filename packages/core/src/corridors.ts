@@ -12,17 +12,27 @@ export interface CollectionNetwork {
 }
 
 export interface Corridor {
-  id: "KE-UG" | "KE-TZ" | "KE-RW";
-  code: "KEUG" | "KETZ" | "KERW";
+  id: "KE-KE" | "KE-UG" | "KE-TZ" | "KE-RW";
+  code: "KEKE" | "KEUG" | "KETZ" | "KERW";
   buyerCountry: PhoneCountry;
-  buyerCountryAlpha3: "UGA" | "TZA" | "RWA";
-  collectionCurrency: "UGX" | "TZS" | "RWF";
+  buyerCountryAlpha3: "KEN" | "UGA" | "TZA" | "RWA";
+  collectionCurrency: "KES" | "UGX" | "TZS" | "RWF";
   payoutCurrency: "KES";
   payoutTransactionType: "mobile_money";
   enabled: true;
 }
 
 export const CORRIDORS: readonly Corridor[] = [
+  {
+    id: "KE-KE",
+    code: "KEKE",
+    buyerCountry: "KE",
+    buyerCountryAlpha3: "KEN",
+    collectionCurrency: "KES",
+    payoutCurrency: "KES",
+    payoutTransactionType: "mobile_money",
+    enabled: true,
+  },
   {
     id: "KE-UG",
     code: "KEUG",
@@ -77,6 +87,15 @@ export const EAC_COLLECTION_LABELS: readonly { currency: "KES" | "UGX" | "TZS" |
  * Uganda, Tanzania, and Rwanda codes are not in that sample. Supply them with PAYAZA_COLLECTION_CODES_JSON
  * after copying the code from Payaza's MoMo sheet or a support reply.
  */
+/** Safaricom Daraja STK. Not a Payaza customer_bank_code. */
+export const MPESA_STK_NETWORK: CollectionNetwork = {
+  currency: "KES",
+  country: "KE",
+  code: "MPESA",
+  displayName: "M-Pesa",
+  source: "Safaricom Daraja CustomerPayBillOnline STK Push",
+};
+
 export const DOCUMENTED_COLLECTION_NETWORKS: readonly CollectionNetwork[] = [
   {
     currency: "KES",
