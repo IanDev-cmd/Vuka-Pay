@@ -6,7 +6,7 @@ services:
     runtime: node
     plan: starter
     buildCommand: npm install && npx prisma generate --schema packages/db/prisma/schema.prisma
-    preDeployCommand: npx prisma db push --schema packages/db/prisma/schema.prisma --skip-generate
+    preDeployCommand: npx prisma migrate deploy --schema packages/db/prisma/schema.prisma
     startCommand: npm run start -w @vukapay/api
     healthCheckPath: /health
     envVars:
@@ -38,8 +38,24 @@ services:
         value: "150"
       - key: FX_SPREAD_BPS
         value: "150"
+      - key: FX_SETTLEMENT_MODE
+        value: treasury_float
+      - key: FX_MAX_OPEN_EXPOSURE_KES_MINOR
+        value: "500000000"
       - key: CREDIT_ENABLED
-        value: "false"
+        value: "true"
+      - key: AT_USERNAME
+        sync: false
+      - key: AT_API_KEY
+        sync: false
+      - key: AT_SENDER_ID
+        sync: false
+      - key: TWILIO_ACCOUNT_SID
+        sync: false
+      - key: TWILIO_AUTH_TOKEN
+        sync: false
+      - key: TWILIO_FROM
+        sync: false
 
   - type: worker
     name: vukapay-worker
@@ -78,12 +94,63 @@ services:
           name: vukapay-api
           type: web
           envVarKey: PAYAZA_TRANSACTION_PIN
+      - key: PAYAZA_BASE_URL
+        value: https://api.payaza.africa/live/
+      - key: PAYAZA_COLLECTION_CODES_JSON
+        fromService:
+          name: vukapay-api
+          type: web
+          envVarKey: PAYAZA_COLLECTION_CODES_JSON
+      - key: PAYAZA_KES_MOMO_BANK_CODE
+        fromService:
+          name: vukapay-api
+          type: web
+          envVarKey: PAYAZA_KES_MOMO_BANK_CODE
+      - key: FX_SETTLEMENT_MODE
+        value: treasury_float
+      - key: FX_MAX_OPEN_EXPOSURE_KES_MINOR
+        value: "500000000"
+      - key: CREDIT_ENABLED
+        value: "true"
+      - key: AT_USERNAME
+        fromService:
+          name: vukapay-api
+          type: web
+          envVarKey: AT_USERNAME
+      - key: AT_API_KEY
+        fromService:
+          name: vukapay-api
+          type: web
+          envVarKey: AT_API_KEY
+      - key: AT_SENDER_ID
+        fromService:
+          name: vukapay-api
+          type: web
+          envVarKey: AT_SENDER_ID
+      - key: TWILIO_ACCOUNT_SID
+        fromService:
+          name: vukapay-api
+          type: web
+          envVarKey: TWILIO_ACCOUNT_SID
+      - key: TWILIO_AUTH_TOKEN
+        fromService:
+          name: vukapay-api
+          type: web
+          envVarKey: TWILIO_AUTH_TOKEN
+      - key: TWILIO_FROM
+        fromService:
+          name: vukapay-api
+          type: web
+          envVarKey: TWILIO_FROM
 
   - type: web
     name: vukapay-web
     runtime: static
     buildCommand: npm install && npm run build -w @vukapay/web
     staticPublishPath: apps/web/dist
+    envVars:
+      - key: VITE_API_URL
+        value: https://vukapay-api.onrender.com
 
 databases:
   - name: vukapay-db

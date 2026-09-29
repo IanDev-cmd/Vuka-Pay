@@ -22,7 +22,11 @@ export function createRails(config: AppConfig, log: (event: Record<string, unkno
   return {
     async processCollection(input) {
       const response = await requireClient().collections.processCollection(input);
-      return { response_code: response.response_code, response_message: response.response_message };
+      return {
+        response_code: response.response_code,
+        response_message: response.response_message,
+        payment_completion_url: response.payment_completion_url,
+      };
     },
     async checkCollection(reference, countryCode) {
       const response = await requireClient().collections.checkStatus(reference, countryCode);

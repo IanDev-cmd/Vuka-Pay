@@ -6,7 +6,7 @@ extendZodWithOpenApi(z);
 export const Money = z
   .object({
     amount_minor: z.string().regex(/^-?\d+$/),
-    currency: z.enum(["KES", "UGX", "TZS", "USD"]),
+    currency: z.enum(["KES", "UGX", "TZS", "RWF", "USD"]),
   })
   .openapi("Money");
 

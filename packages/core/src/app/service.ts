@@ -23,6 +23,8 @@ import { assertCanPayout, lockPayoutMethod, nextStatusAfterOtpSend, nextStatusAf
 import { assertInvoiceAllowed, assertPayoutAllowed, duplicateInvoice } from "../risk.js";
 import { availableActions, isDisputeWindow } from "../actions.js";
 import { corridorById, corridorForBuyerCurrency, assertCollectionNetwork } from "../corridors.js";
+import { paymentQrText } from "../qr.js";
+import { escrowFingerprint, issueNfcToken, readNfcToken } from "../nfc.js";
 import { scoreTradeRecords } from "../credit.js";
 import { renderTemplate, type Language } from "../templates.js";
 import { FUNDS_HOLDING } from "../fundsHolding.js";
@@ -265,7 +267,7 @@ export class VukaService {
 
   async createInvoice(userId: string, input: {
     items: { description: string; quantity: number; unitMinor: bigint }[];
-    buyer: { name: string; phone: string; country: "UG" | "TZ"; network?: string; currency: "UGX" | "TZS" };
+    buyer: { name: string; phone: string; country: "UG" | "TZ" | "RW"; network?: string; currency: "UGX" | "TZS" | "RWF" };
     notes?: string;
     shippingDeadline?: string;
     disputeWindowHours?: number;
@@ -274,10 +276,7 @@ export class VukaService {
   }) {
     const business = await this.requireBusiness(userId);
     const corridor = corridorForBuyerCurrency(input.buyer.currency);
-    if (input.buyer.country === "UG" && corridor.id !== "KE-UG") {
-      throw new DomainError("VALIDATION_FAILED", "Buyer country does not match the currency corridor", 422);
-    }
-    if (input.buyer.country === "TZ" && corridor.id !== "KE-TZ") {
+    if (input.buyer.country !== corridor.buyerCountry) {
       throw new DomainError("VALIDATION_FAILED", "Buyer country does not match the currency corridor", 422);
     }
     if (input.disputeWindowHours != null && !isDisputeWindow(input.disputeWindowHours)) {
@@ -566,11 +565,24 @@ export class VukaService {
     if (fresh.state === "AWAITING_PAYMENT") {
       await this.move(fresh, "PROMPT_SENT", "buyer", "prompt sent");
     }
+    const checkoutUrl = response.payment_completion_url ?? null;
     return {
       collection_id: collection.id,
       status: "PENDING" as const,
       expires_at: fresh.quoteExpiresAt,
-      prompt_instructions: "Approve the mobile-money prompt on your phone. A response code of 09 means the prompt was sent, not that you have paid.",
+      prompt_instructions: checkoutUrl
+        ? "Open the Payaza checkout link, or approve the prompt on your phone. A response code of 09 means the request was accepted, not that you have paid."
+        : "Approve the mobile-money prompt on your phone. A response code of 09 means the prompt was sent, not that you have paid.",
+      payaza_checkout_url: checkoutUrl,
+      payment_qr: paymentQrText({
+        invoiceId: fresh.invoiceId,
+        tradeId: fresh.id,
+        payToken: token,
+        corridor: fresh.corridorId,
+        settlementCurrency: "KES",
+        amount: fresh.quotedBuyerMinor.toString(),
+        payazaCheckoutUrl: checkoutUrl,
+      }),
     };
   }
 
@@ -635,6 +647,14 @@ export class VukaService {
       await repo.saveTrade(trade);
     });
     await this.move(trade, decision.command, "payaza", input.amountValidation ?? "collection");
+    if (
+      this.deps.config.smsConfigured &&
+      (decision.command === "PAYMENT_EXACT" || decision.command === "PAYMENT_OVER" || decision.command === "TOP_UP")
+    ) {
+      await this.deps.notifier
+        .sms(trade.buyerPhone, renderTemplate("en", "payment_received", {}))
+        .catch(() => undefined);
+    }
     return { applied: true, state: (await this.requireTrade(trade.id)).state };
   }
 
@@ -692,6 +712,26 @@ export class VukaService {
     await this.deps.notifier.sms(trade.buyerPhone, renderTemplate("en", "delivery_code", { code: issued.code }));
     await this.move(trade, "DELIVERY_CLAIMED", userId, "delivery claimed");
     return this.tradeView(trade.id);
+  }
+
+  async verifyNfc(tradeId: string, token: string) {
+    const trade = await this.requireTrade(tradeId);
+    const parsed = readNfcToken(this.deps.config.appSecret, token, this.now());
+    if (parsed.tradeId !== trade.id || parsed.escrowHash !== escrowFingerprint(trade.id, trade.itemsMinor.toString())) {
+      throw new DomainError("VALIDATION_FAILED", "NFC token does not match this trade", 422);
+    }
+    if (trade.state !== "SHIPPED" && trade.state !== "DELIVERY_CLAIMED") {
+      throw new DomainError("CONFLICT", "This trade is not waiting for delivery verification", 409);
+    }
+    await this.move(trade, "NFC_VERIFY", "nfc", "tag verified", { nfcOk: true });
+    await this.submitRelease(await this.requireTrade(trade.id));
+    return this.tradeView(trade.id);
+  }
+
+  async verifyNfcForBuyer(payToken: string, nfcToken: string) {
+    const { tradeId } = this.parseBuyer(payToken);
+    await this.verifyNfc(tradeId, nfcToken);
+    return this.tradeView(tradeId, "buyer");
   }
 
   async confirmDelivery(token: string, code: string) {
@@ -988,6 +1028,7 @@ export class VukaService {
       payoutIntent: (extra.payoutIntent as PayoutIntent) ?? trade.payoutIntent,
       payazaConfirmedFailure: extra.payazaConfirmedFailure === true,
       codeMatches: extra.codeMatches === true,
+      nfcOk: extra.nfcOk === true,
       attemptCount: typeof extra.attemptCount === "number" ? extra.attemptCount : trade.attemptCount,
       maxAttempts: 3,
     });
@@ -1149,6 +1190,15 @@ export class VukaService {
     const payouts = await this.deps.repo.payouts({ tradeId: trade.id });
     const paid = payouts.find((row) => row.status === "SUCCEEDED" && row.kind === "RELEASE");
     const payoutVerified = method?.status === "VERIFIED" || method?.status === "LOCKED";
+    const shipped = events.find((event) => event.command === "SHIP");
+    const nfcToken =
+      viewer === "exporter" && shipped
+        ? issueNfcToken(this.deps.config.appSecret, {
+            tradeId: trade.id,
+            escrowHash: escrowFingerprint(trade.id, trade.itemsMinor.toString()),
+            issuedAt: shipped.createdAt,
+          })
+        : null;
     return {
       id: trade.id,
       state: trade.state,
@@ -1169,6 +1219,7 @@ export class VukaService {
       shipping_deadline: invoice?.shippingDeadline ?? null,
       dispute_window_hours: invoice?.disputeWindowHours ?? null,
       mpesa_reference: paid?.transactionReference ?? null,
+      nfc_token: nfcToken,
       available_actions: availableActions(trade.state, viewer),
       parties: {
         exporter: {

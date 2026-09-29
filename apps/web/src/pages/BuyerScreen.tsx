@@ -111,7 +111,7 @@ export function BuyerScreen({
   const networks = useMemo(() => networksFor(quote), [quote]);
   const selected = networks.find((row) => row.display_name === networkName) ?? networks[0];
   const currency = quote?.collection_currency ?? "UGX";
-  const flag = currency === "UGX" ? "UG" : "TZ";
+  const flag = currency === "TZS" ? "TZ" : currency === "RWF" ? "RW" : "UG";
 
   const top: CardFace = {
     label: "You pay",
@@ -256,7 +256,9 @@ function networksFor(quote: BuyerQuote | null): NetworkOption[] {
   return CORRIDOR_NETWORKS[quote?.collection_currency ?? "UGX"];
 }
 
-function prefixHint(currency: "UGX" | "TZS"): string {
-  return currency === "UGX" ? "numbers start with 256" : "numbers start with 255";
+function prefixHint(currency: "UGX" | "TZS" | "RWF"): string {
+  if (currency === "TZS") return "numbers start with 255";
+  if (currency === "RWF") return "numbers start with 250";
+  return "numbers start with 256";
 }
 

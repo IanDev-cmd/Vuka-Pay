@@ -11,7 +11,20 @@ export class ApiError extends Error {
   }
 }
 
-async function request<T>(path: string, init?: RequestInit): Promise<T> {
+const TOKEN_KEY = "vukapay_access_token";
+const TRADES_CACHE_KEY = "vukapay_trades_cache";
+
+export function apiBase(): string {
+  const configured = import.meta.env.VITE_API_URL;
+  return configured ? configured.replace(/\/$/, "") : "";
+}
+
+export function setAccessToken(token: string | null): void {
+  if (token) localStorage.setItem(TOKEN_KEY, token);
+  else localStorage.removeItem(TOKEN_KEY);
+}
+
+export async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const headers = new Headers(init?.headers);
   headers.set("Accept", "application/json");
   if (!headers.has("Accept-Language")) headers.set("Accept-Language", "en");
@@ -19,7 +32,10 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   if (init?.method && init.method !== "GET" && !headers.has("Idempotency-Key")) {
     headers.set("Idempotency-Key", crypto.randomUUID());
   }
-  const response = await fetch(path, { ...init, headers });
+  const token = localStorage.getItem(TOKEN_KEY);
+  if (token && !headers.has("Authorization")) headers.set("Authorization", `Bearer ${token}`);
+  const url = path.startsWith("http") ? path : `${apiBase()}${path}`;
+  const response = await fetch(url, { ...init, headers });
   const text = await response.text();
   const body = text ? (JSON.parse(text) as unknown) : null;
   if (!response.ok) {
@@ -39,7 +55,7 @@ function money(value: unknown): Money | null {
   if (!isRecord(value)) return null;
   const amount = value.amount_minor;
   const currency = value.currency;
-  if (typeof amount !== "string" || (currency !== "KES" && currency !== "UGX" && currency !== "TZS")) return null;
+  if (typeof amount !== "string" || (currency !== "KES" && currency !== "UGX" && currency !== "TZS" && currency !== "RWF")) return null;
   return { amount_minor: amount, currency };
 }
 
@@ -59,8 +75,8 @@ export async function getPay(token: string): Promise<BuyerQuote> {
   const fees = isRecord(quote.fee_breakdown) ? quote.fee_breakdown : isRecord(quote.fees) ? quote.fees : {};
   const collection = quote.buyer_amount ?? body.buyer_amount;
   const buyer = requireMoney(collection, "buyer_amount");
-  if (buyer.currency !== "UGX" && buyer.currency !== "TZS") {
-    throw new ApiError("VALIDATION_FAILED", "Buyer currency is not UGX or TZS", 422);
+  if (buyer.currency !== "UGX" && buyer.currency !== "TZS" && buyer.currency !== "RWF") {
+    throw new ApiError("VALIDATION_FAILED", "Buyer currency is not an EAC collection currency", 422);
   }
   const goods = money(fees.items) ?? money(fees.goods) ?? money(quote.kes_total) ?? money(body.kes_total);
   if (!goods) throw new ApiError("VALIDATION_FAILED", "Pay link is missing the KES amounts", 422);
@@ -162,7 +178,7 @@ export async function getPayStatus(token: string): Promise<PayStatus> {
 }
 
 export interface CorridorMeta {
-  currency: "UGX" | "TZS";
+  currency: "UGX" | "TZS" | "RWF";
   networks: NetworkOption[];
 }
 
@@ -173,7 +189,7 @@ export async function getCorridors(): Promise<CorridorMeta[]> {
   for (const row of rows) {
     if (!isRecord(row)) continue;
     const currency = row.collection_currency ?? row.currency;
-    if (currency !== "UGX" && currency !== "TZS") continue;
+    if (currency !== "UGX" && currency !== "TZS" && currency !== "RWF") continue;
     corridors.push({ currency, networks: readNetworks(row.networks) });
   }
   return corridors;
@@ -181,7 +197,7 @@ export async function getCorridors(): Promise<CorridorMeta[]> {
 
 export interface InvoiceDraft {
   items: { description: string; quantity: number; unit: Money }[];
-  buyer: { name: string; phone: string; country: "UG" | "TZ"; network: string; currency: "UGX" | "TZS" };
+  buyer: { name: string; phone: string; country: "UG" | "TZ" | "RW"; network: string; currency: "UGX" | "TZS" | "RWF" };
   notes?: string;
   shipping_deadline?: string;
   dispute_window_hours?: number;
@@ -216,8 +232,8 @@ export async function createInvoice(draft: InvoiceDraft): Promise<{ id: string; 
 
 function quoteFromInvoice(body: Record<string, unknown>): BuyerQuote {
   const buyer = requireMoney(body.buyer_amount, "buyer_amount");
-  if (buyer.currency !== "UGX" && buyer.currency !== "TZS") {
-    throw new ApiError("VALIDATION_FAILED", "Buyer currency is not UGX or TZS", 422);
+  if (buyer.currency !== "UGX" && buyer.currency !== "TZS" && buyer.currency !== "RWF") {
+    throw new ApiError("VALIDATION_FAILED", "Buyer currency is not an EAC collection currency", 422);
   }
   const goods = requireMoney(body.kes_total ?? body.items_total, "kes_total");
   const net = money(body.exporter_net);
@@ -247,7 +263,21 @@ export async function sendInvoice(id: string): Promise<void> {
 }
 
 export async function listTrades(): Promise<{ id: string; state: string }[]> {
-  const body = await request<unknown>("/v1/trades");
+  try {
+    const body = await request<unknown>("/v1/trades");
+    const rows = readTradeRows(body);
+    localStorage.setItem(TRADES_CACHE_KEY, JSON.stringify(rows));
+    return rows;
+  } catch (error) {
+    const cached = localStorage.getItem(TRADES_CACHE_KEY);
+    if (cached && typeof navigator !== "undefined" && !navigator.onLine) {
+      return JSON.parse(cached) as { id: string; state: string }[];
+    }
+    throw error;
+  }
+}
+
+function readTradeRows(body: unknown): { id: string; state: string }[] {
   const rows = Array.isArray(body) ? body : isRecord(body) && Array.isArray(body.data) ? body.data : [];
   return rows.flatMap((row) => {
     if (!isRecord(row) || typeof row.id !== "string") return [];

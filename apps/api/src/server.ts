@@ -173,7 +173,7 @@ export async function buildServer(deps: ServerDeps) {
     idempotent(request, reply, auth(request).sub, async () => {
       const body = request.body as {
         items: { description: string; quantity: number; unit_amount_minor: string }[];
-        buyer: { name: string; phone: string; country: "UG" | "TZ"; network?: string; currency: "UGX" | "TZS" };
+        buyer: { name: string; phone: string; country: "UG" | "TZ" | "RW"; network?: string; currency: "UGX" | "TZS" | "RWF" };
         notes?: string;
         shipping_deadline?: string;
         dispute_window_hours?: number;
@@ -211,6 +211,13 @@ export async function buildServer(deps: ServerDeps) {
   );
   app.post("/v1/trades/:id/delivery-claim", async (request, reply) =>
     idempotent(request, reply, auth(request).sub, () => svc().deliveryClaim(auth(request).sub, (request.params as { id: string }).id)),
+  );
+  app.post("/v1/trades/:id/verify-nfc", async (request, reply) =>
+    idempotent(request, reply, auth(request).sub, async () => {
+      const tradeId = (request.params as { id: string }).id;
+      await svc().getTrade(auth(request).sub, tradeId);
+      return svc().verifyNfc(tradeId, (request.body as { token: string }).token);
+    }),
   );
   app.post("/v1/trades/:id/evidence", async () => {
     throw new DomainError("CAPABILITY_GATED", "Object storage is not configured, so evidence files are not accepted", 409);
@@ -252,7 +259,10 @@ export async function buildServer(deps: ServerDeps) {
     idempotent(request, reply, "buyer", async () => {
       const token = (request.params as { token: string }).token;
       const view = await svc().buyerView(token);
-      const currency = view.buyer_amount.currency === "TZS" ? "TZS" : "UGX";
+      const currency = view.buyer_amount.currency;
+      if (currency !== "UGX" && currency !== "TZS" && currency !== "RWF") {
+        throw new DomainError("VALIDATION_FAILED", "This pay link is not an EAC collection currency", 422);
+      }
       return svc().refreshBuyerQuote(token, await loadObservations(currency));
     }),
   );
@@ -270,6 +280,11 @@ export async function buildServer(deps: ServerDeps) {
       return svc().collect((request.params as { token: string }).token, { phone: body.phone, networkCode: body.network_code });
     }),
   );
+  app.post("/v1/pay/:token/verify-nfc", async (request, reply) =>
+    idempotent(request, reply, "buyer", () =>
+      svc().verifyNfcForBuyer((request.params as { token: string }).token, (request.body as { token: string }).token),
+    ),
+  );
   app.post("/v1/pay/:token/confirm-delivery", async (request, reply) =>
     idempotent(request, reply, "buyer", () =>
       svc().confirmDelivery((request.params as { token: string }).token, (request.body as { code: string }).code),
@@ -285,7 +300,7 @@ export async function buildServer(deps: ServerDeps) {
     idempotent(request, reply, auth(request).sub, async () => {
       const business = await repo().businessByUser(auth(request).sub);
       if (!business) throw new DomainError("NOT_FOUND", "Business missing", 404);
-      const body = request.body as { partner_code: string; buyer_name: string; buyer_phone: string; buyer_country: "UG" | "TZ"; currency: "UGX" | "TZS"; network_code?: string };
+      const body = request.body as { partner_code: string; buyer_name: string; buyer_phone: string; buyer_country: "UG" | "TZ" | "RW"; currency: "UGX" | "TZS" | "RWF"; network_code?: string };
       const row = {
         id: newId("prt"),
         businessId: business.id,
@@ -517,6 +532,14 @@ export async function buildServer(deps: ServerDeps) {
         return reply.code(401).send({
           error: { code: "UNAUTHENTICATED", message: "Invalid Payaza signature", request_id: request.id },
         });
+      }
+      if (deps.repo) {
+        try {
+          await svc().ingestPayazaBody(raw.toString("utf8"));
+          await deps.repo.markPayazaEvent(id, null);
+        } catch (error) {
+          await deps.repo.markPayazaEvent(id, error instanceof Error ? error.message : "process failed");
+        }
       }
       return reply.code(200).send({ received: true });
     });

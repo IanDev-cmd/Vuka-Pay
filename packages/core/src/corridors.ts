@@ -12,11 +12,11 @@ export interface CollectionNetwork {
 }
 
 export interface Corridor {
-  id: "KE-UG" | "KE-TZ";
-  code: "KEUG" | "KETZ";
+  id: "KE-UG" | "KE-TZ" | "KE-RW";
+  code: "KEUG" | "KETZ" | "KERW";
   buyerCountry: PhoneCountry;
-  buyerCountryAlpha3: "UGA" | "TZA";
-  collectionCurrency: "UGX" | "TZS";
+  buyerCountryAlpha3: "UGA" | "TZA" | "RWA";
+  collectionCurrency: "UGX" | "TZS" | "RWF";
   payoutCurrency: "KES";
   payoutTransactionType: "mobile_money";
   enabled: true;
@@ -43,11 +43,39 @@ export const CORRIDORS: readonly Corridor[] = [
     payoutTransactionType: "mobile_money",
     enabled: true,
   },
+  {
+    id: "KE-RW",
+    code: "KERW",
+    buyerCountry: "RW",
+    buyerCountryAlpha3: "RWA",
+    collectionCurrency: "RWF",
+    payoutCurrency: "KES",
+    payoutTransactionType: "mobile_money",
+    enabled: true,
+  },
+];
+
+/**
+ * Display names for the EAC networks this product collects on.
+ * `code` stays empty until Payaza publishes that customer_bank_code.
+ * Do not copy MTNUG, AIRUG, M-PESATZ, TIGOTZ, AIRTZ, MTNRW, or AIRRW into
+ * DOCUMENTED_COLLECTION_NETWORKS: they are not in the process-collection samples.
+ */
+export const EAC_COLLECTION_LABELS: readonly { currency: "KES" | "UGX" | "TZS" | "RWF"; displayName: string }[] = [
+  { currency: "KES", displayName: "M-Pesa" },
+  { currency: "UGX", displayName: "MTN Mobile Money" },
+  { currency: "UGX", displayName: "Airtel Money" },
+  { currency: "TZS", displayName: "Vodacom M-Pesa" },
+  { currency: "TZS", displayName: "Tigo Pesa" },
+  { currency: "TZS", displayName: "Airtel Money" },
+  { currency: "RWF", displayName: "MTN Mobile Money" },
+  { currency: "RWF", displayName: "Airtel Money" },
 ];
 
 /**
  * The only collection bank code that appears verbatim in Payaza's KES process-collection sample.
- * Uganda and Tanzania codes are not in that sample or in the sheet export fetched on 2026-09-28.
+ * Uganda, Tanzania, and Rwanda codes are not in that sample. Supply them with PAYAZA_COLLECTION_CODES_JSON
+ * after copying the code from Payaza's MoMo sheet or a support reply.
  */
 export const DOCUMENTED_COLLECTION_NETWORKS: readonly CollectionNetwork[] = [
   {

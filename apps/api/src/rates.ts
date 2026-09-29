@@ -15,16 +15,18 @@ export async function fxFeedsHealthy(now = Date.now()): Promise<boolean> {
   }
 }
 
-export async function loadObservations(quote: "UGX" | "TZS", now = new Date()): Promise<RateObservation[]> {
-  const [exchange, fawaz] = await Promise.allSettled([exchangeRateApi(now), fawazRate(quote, now)]);
+export async function loadObservations(quote: "UGX" | "TZS" | "RWF", now = new Date()): Promise<RateObservation[]> {
+  const [exchange, fawaz] = await Promise.allSettled([exchangeRateApi(now), fawazRate()]);
   const observations: RateObservation[] = [];
   for (const result of [exchange, fawaz]) {
     if (result.status === "fulfilled" && result.value) {
       const leg = result.value;
+      const perUsd = quote === "UGX" ? leg.ugxPerUsd : quote === "TZS" ? leg.tzsPerUsd : leg.rwfPerUsd;
+      if (!perUsd) continue;
       observations.push({
         source: leg.source,
         asOf: leg.asOf,
-        rate: quotePerKes(leg.kesPerUsd, quote === "UGX" ? leg.ugxPerUsd : leg.tzsPerUsd),
+        rate: quotePerKes(leg.kesPerUsd, perUsd),
       });
     }
   }
@@ -42,7 +44,7 @@ async function exchangeRateApi(now: Date) {
   const body = (await response.json()) as {
     result?: string;
     time_last_update_unix?: number;
-    rates?: { KES?: number; UGX?: number; TZS?: number };
+    rates?: { KES?: number; UGX?: number; TZS?: number; RWF?: number };
   };
   if (body.result !== "success" || !body.rates?.KES || !body.rates.UGX || !body.rates.TZS) {
     throw new Error("exchangerate-api missing KES/UGX/TZS");
@@ -53,13 +55,14 @@ async function exchangeRateApi(now: Date) {
     kesPerUsd: String(body.rates.KES),
     ugxPerUsd: String(body.rates.UGX),
     tzsPerUsd: String(body.rates.TZS),
+    rwfPerUsd: body.rates.RWF ? String(body.rates.RWF) : "",
   };
 }
 
-async function fawazRate(_quote: "UGX" | "TZS", _now: Date) {
+async function fawazRate() {
   const response = await fetch("https://cdn.jsdelivr.net/npm/@fawazahmed0/currency-api@latest/v1/currencies/usd.min.json");
   if (!response.ok) throw new Error(`fawazahmed0 ${response.status}`);
-  const body = (await response.json()) as { date?: string; usd?: { kes?: number; ugx?: number; tzs?: number } };
+  const body = (await response.json()) as { date?: string; usd?: { kes?: number; ugx?: number; tzs?: number; rwf?: number } };
   if (!body.usd?.kes || !body.usd.ugx || !body.usd.tzs || !body.date) throw new Error("fawazahmed0 missing rates");
   return {
     source: "fawazahmed0",
@@ -67,5 +70,6 @@ async function fawazRate(_quote: "UGX" | "TZS", _now: Date) {
     kesPerUsd: String(body.usd.kes),
     ugxPerUsd: String(body.usd.ugx),
     tzsPerUsd: String(body.usd.tzs),
+    rwfPerUsd: body.usd.rwf ? String(body.usd.rwf) : "",
   };
 }

@@ -1,6 +1,6 @@
 import { useId } from "react";
 
-export type FlagCode = "UG" | "TZ" | "KE";
+export type FlagCode = "UG" | "TZ" | "KE" | "RW";
 
 export function Flag({ code, size = 22 }: { code: FlagCode; size?: number }) {
   const clip = useId().replace(/:/g, "");
@@ -15,6 +15,7 @@ export function Flag({ code, size = 22 }: { code: FlagCode; size?: number }) {
         {code === "UG" ? <Uganda /> : null}
         {code === "TZ" ? <Tanzania /> : null}
         {code === "KE" ? <Kenya /> : null}
+        {code === "RW" ? <Rwanda /> : null}
       </g>
     </svg>
   );
@@ -39,6 +40,16 @@ function Tanzania() {
       <polygon points="22,0 22,22 0,22" fill="#00A3DD" />
       <polygon points="0,4.2 17.8,22 22,22 22,17.8 4.2,0 0,0" fill="#FCD116" />
       <polygon points="0,2.2 19.8,22 22,22 22,19.8 2.2,0 0,0" fill="#000" />
+    </>
+  );
+}
+
+function Rwanda() {
+  return (
+    <>
+      <rect width="22" height="7.4" fill="#00A1DE" />
+      <rect y="7.4" width="22" height="7.2" fill="#FAD201" />
+      <rect y="14.6" width="22" height="7.4" fill="#20603D" />
     </>
   );
 }

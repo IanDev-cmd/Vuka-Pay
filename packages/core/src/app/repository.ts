@@ -296,7 +296,7 @@ export interface Rails {
     customer_last_name: string;
     customer_phone_number: string;
     country_code: string;
-  }): Promise<{ response_code: string; response_message?: string }>;
+  }): Promise<{ response_code: string; response_message?: string; payment_completion_url?: string }>;
   checkCollection(reference: string, countryCode: string): Promise<{ response_code: string; transaction_status?: string }>;
   initiatePayout(input: {
     transaction_type: string;

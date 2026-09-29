@@ -19,7 +19,7 @@ export function PhoneSheet({
 }: {
   title: string;
   hint: string;
-  currency: "UGX" | "TZS";
+  currency: "UGX" | "TZS" | "RWF";
   flag: FlagCode;
   networks: NetworkOption[];
   networkId: string;

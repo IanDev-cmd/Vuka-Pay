@@ -1,4 +1,4 @@
-export type CurrencyCode = "KES" | "UGX" | "TZS";
+export type CurrencyCode = "KES" | "UGX" | "TZS" | "RWF";
 
 export interface Money {
   amount_minor: string;
@@ -32,7 +32,7 @@ export interface BuyerQuote {
   /** Buyer-currency major units per 1 KES. */
   rate: string | null;
   expires_at: string | null;
-  collection_currency: "UGX" | "TZS";
+  collection_currency: "UGX" | "TZS" | "RWF";
   fees: FeeLines;
   networks: NetworkOption[];
 }

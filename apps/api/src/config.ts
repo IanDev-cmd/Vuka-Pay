@@ -68,8 +68,8 @@ function parseNetworks(raw: string | undefined): CollectionNetwork[] {
   const parsed = z
     .array(
       z.object({
-        currency: z.enum(["KES", "UGX", "TZS", "USD"]),
-        country: z.enum(["KE", "UG", "TZ"]),
+        currency: z.enum(["KES", "UGX", "TZS", "RWF", "USD"]),
+        country: z.enum(["KE", "UG", "TZ", "RW"]),
         code: z.string().min(1),
         display_name: z.string().min(1),
         source: z.string().min(8),

@@ -482,4 +482,56 @@ button.next-card { cursor: pointer; }
     width: auto;
     z-index: 5;
   }
+  .delivery-actions .summary-button,
+  .delivery-actions .install-close {
+    position: static;
+    width: 100%;
+  }
+}
+
+.install-link {
+  background: transparent;
+  border: 0;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+  min-height: 44px;
+}
+.install-sheet {
+  position: fixed;
+  inset: 0;
+  z-index: 30;
+  background: rgba(0, 0, 0, 0.45);
+  display: grid;
+  align-items: end;
+}
+.install-card {
+  background: #fff;
+  color: #111;
+  border-radius: 16px 16px 0 0;
+  padding: 20px 16px 28px;
+  display: grid;
+  gap: 12px;
+  justify-items: center;
+  text-align: center;
+}
+.install-close {
+  background: transparent;
+  border: 0;
+  min-height: 44px;
+  font: inherit;
+  cursor: pointer;
+}
+.delivery-actions {
+  display: grid;
+  gap: 8px;
+  margin-top: 12px;
+}
+.pay-qr {
+  display: block;
+  margin: 16px auto;
+}
+@media (min-width: 800px) {
+  .install-sheet { align-items: center; justify-items: center; }
+  .install-card { border-radius: 16px; width: min(360px, 92vw); }
 }

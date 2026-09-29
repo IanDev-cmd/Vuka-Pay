@@ -56,7 +56,7 @@ export function observationsFromUsdLegs(legs: UsdLeg[], quote: Currency): RateOb
 
 export function issueQuote(input: {
   itemsMinor: bigint;
-  to: Extract<Currency, "UGX" | "TZS">;
+  to: Extract<Currency, "UGX" | "TZS" | "RWF">;
   observations: RateObservation[];
   config: QuoteConfig;
   now: Date;
@@ -93,7 +93,7 @@ export function issueQuote(input: {
     amountMinor: input.itemsMinor,
     amountExponent: 2,
     rate: withSpread,
-    outExponent: input.to === "UGX" || input.to === "TZS" ? 0 : 2,
+    outExponent: input.to === "UGX" || input.to === "TZS" || input.to === "RWF" ? 0 : 2,
   });
   if (applied.amountMinor <= 0n) {
     throw new DomainError("FX_RATE_UNAVAILABLE", "Quoted buyer amount rounded to zero", 503);

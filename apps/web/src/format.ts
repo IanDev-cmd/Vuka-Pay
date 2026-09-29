@@ -1,13 +1,13 @@
 import type { CurrencyCode, Money } from "./types";
 
-const EXPONENTS: Record<CurrencyCode, number> = { KES: 2, UGX: 0, TZS: 0 };
+const EXPONENTS: Record<CurrencyCode, number> = { KES: 2, UGX: 0, TZS: 0, RWF: 0 };
 
 export function formatMoney(money: Money, withCode = false): string {
   const amount = formatMinor(money.amount_minor, money.currency);
   return withCode ? `${money.currency} ${amount}` : amount;
 }
 
-/** Whole units for UGX and TZS. KES hides a zero fraction. */
+/** Whole units for UGX, TZS, and RWF. KES hides a zero fraction. */
 export function formatMinor(amountMinor: string, currency: CurrencyCode): string {
   if (!/^-?\d+$/.test(amountMinor)) return amountMinor;
   const negative = amountMinor.startsWith("-");
@@ -61,8 +61,8 @@ export function heldUntilClock(expiresAt: string): string {
   });
 }
 
-export function normalizePhoneDigits(input: string, currency: "UGX" | "TZS"): string {
-  const prefix = currency === "UGX" ? "256" : "255";
+export function normalizePhoneDigits(input: string, currency: "UGX" | "TZS" | "RWF"): string {
+  const prefix = currency === "UGX" ? "256" : currency === "TZS" ? "255" : "250";
   let digits = input.replace(/\D/g, "");
   if (digits.startsWith(prefix)) digits = digits.slice(prefix.length);
   digits = digits.replace(/^0+/, "");

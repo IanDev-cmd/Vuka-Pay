@@ -1,7 +1,11 @@
 import { useEffect, useState } from "react";
-import { ApiError, createInvoice, listTrades, sendInvoice } from "../api";
+import { ApiError, createInvoice, listTrades, request, sendInvoice } from "../api";
 import { Avatar, type PartyFace } from "../components/Avatar";
+import { DeliveryActions } from "../components/DeliveryActions";
+import { PaymentQr } from "../components/PaymentQr";
 import { PhoneSheet } from "../components/PhoneSheet";
+import { PwaInstall } from "../components/PwaInstall";
+import { paymentQrText } from "../qrPayload";
 import { placeholderQuote } from "../example";
 import { formatMoney, majorToMinor, normalizePhoneDigits } from "../format";
 import { navigate } from "../nav";
@@ -14,7 +18,9 @@ type DisputeHours = 24 | 48 | 72;
 
 interface SessionModel {
   state: string;
-  corridor: "KE-UG" | "KE-TZ";
+  corridor: "KE-UG" | "KE-TZ" | "KE-RW";
+  tradeId: string | null;
+  nfcToken: string | null;
   goods: Money;
   vukapayFee: Money | null;
   payazaLabel: string;
@@ -78,15 +84,7 @@ export function SessionScreen({
     if (preview) return;
     let cancelled = false;
     const path = token ? `/v1/pay/${encodeURIComponent(token)}` : `/v1/trades/${encodeURIComponent(tradeId ?? "")}`;
-    fetch(path, { headers: { Accept: "application/json" } })
-      .then(async (response) => {
-        const body = await response.json().catch(() => null);
-        if (!response.ok) {
-          const message = body && typeof body === "object" && body.error?.message ? String(body.error.message) : response.statusText;
-          throw new Error(message);
-        }
-        return body;
-      })
+    request<unknown>(path)
       .then((body) => {
         if (!cancelled) setModel((current) => sessionFromApi(body, viewer, current ?? placeholderSession(viewer)));
       })
@@ -133,26 +131,15 @@ export function SessionScreen({
     if (button.id === "send_invoice") setSheet("send");
   }
 
-  async function postJson(path: string, body: unknown) {
+  async function postJson(path: string, body: unknown): Promise<unknown> {
     setBusy(true);
     try {
-      const response = await fetch(path, {
-        method: "POST",
-        headers: {
-          Accept: "application/json",
-          "Content-Type": "application/json",
-          "Idempotency-Key": crypto.randomUUID(),
-        },
-        body: JSON.stringify(body),
-      });
-      const payload = await response.json().catch(() => null);
-      if (!response.ok) {
-        const message = payload && typeof payload === "object" && payload.error?.message ? String(payload.error.message) : response.statusText;
-        throw new Error(message);
-      }
+      const payload = await request<unknown>(path, { method: "POST", body: JSON.stringify(body) });
       if (payload) setModel((current) => sessionFromApi(payload, viewer, current ?? placeholderSession(viewer)));
+      return payload;
     } catch (reason: unknown) {
       setError(reason instanceof Error ? reason.message : "Request failed");
+      return null;
     } finally {
       setBusy(false);
     }
@@ -165,7 +152,7 @@ export function SessionScreen({
       setError("Enter the goods value in KES.");
       return;
     }
-    const currency = model.corridor === "KE-UG" ? "UGX" : "TZS";
+    const currency = collectionCurrency(model.corridor);
     const network = CORRIDOR_NETWORKS[currency][0];
     if (!network?.code) {
       setSheet(null);
@@ -222,6 +209,7 @@ export function SessionScreen({
             <button type="button" aria-current={page === "support" ? "page" : undefined} onClick={() => navigate("/support")}>
               Support
             </button>
+            <PwaInstall />
           </nav>
           <button type="button" className="menu-button" aria-label="Menu" onClick={() => setMenu((open) => !open)}>
             <span />
@@ -318,6 +306,28 @@ export function SessionScreen({
                   {button.label}
                 </button>
               )}
+              {!preview && model ? (
+                <DeliveryActions
+                  viewer={viewer}
+                  state={model.state}
+                  nfcToken={model.nfcToken}
+                  busy={busy}
+                  onShip={async () => {
+                    if (!tradeId) return null;
+                    const payload = await postJson(`/v1/trades/${encodeURIComponent(tradeId)}/ship`, {});
+                    if (!payload || typeof payload !== "object" || !("nfc_token" in payload)) return null;
+                    const tokenValue = (payload as { nfc_token?: unknown }).nfc_token;
+                    return typeof tokenValue === "string" ? tokenValue : null;
+                  }}
+                  onVerify={async (tag) => {
+                    const path = token
+                      ? `/v1/pay/${encodeURIComponent(token)}/verify-nfc`
+                      : `/v1/trades/${encodeURIComponent(tradeId ?? "")}/verify-nfc`;
+                    await postJson(path, { token: tag });
+                  }}
+                  onCode={() => setSheet("code")}
+                />
+              ) : null}
               {viewer === "buyer" && model.state === "PAID_OUT" ? <p className="hint">Receipt</p> : null}
             </article>
 
@@ -411,7 +421,7 @@ export function SessionScreen({
                   </label>
                   <label className="field">
                     <span className="field-name">Corridor</span>
-                    <div className="readonly-box">{model.corridor === "KE-UG" ? "Kenya → Uganda" : "Kenya → Tanzania"}</div>
+                    <div className="readonly-box">{corridorLabel(model.corridor)}</div>
                   </label>
                 </div>
               </div>
@@ -429,6 +439,19 @@ export function SessionScreen({
               </button>
             </div>
             <BuyerScreen token={token} embedded party={model.parties.exporter} />
+            {token ? (
+              <PaymentQr
+                text={paymentQrText({
+                  invoiceId: model.invoiceNumber,
+                  tradeId: model.tradeId ?? "",
+                  payToken: token,
+                  corridor: model.corridor,
+                  settlementCurrency: "KES",
+                  amount: model.buyerAmount.amount_minor,
+                  payazaCheckoutUrl: null,
+                })}
+              />
+            ) : null}
           </div>
         </div>
       ) : null}
@@ -437,10 +460,10 @@ export function SessionScreen({
         <PhoneSheet
           title="Send invoice"
           hint="Buyer name and mobile-money number."
-          currency={model.corridor === "KE-UG" ? "UGX" : "TZS"}
-          flag={model.corridor === "KE-UG" ? "UG" : "TZ"}
-          networks={CORRIDOR_NETWORKS[model.corridor === "KE-UG" ? "UGX" : "TZS"]}
-          networkId={CORRIDOR_NETWORKS[model.corridor === "KE-UG" ? "UGX" : "TZS"][0]?.display_name ?? ""}
+          currency={collectionCurrency(model.corridor)}
+          flag={collectionCurrency(model.corridor) === "TZS" ? "TZ" : collectionCurrency(model.corridor) === "RWF" ? "RW" : "UG"}
+          networks={CORRIDOR_NETWORKS[collectionCurrency(model.corridor)]}
+          networkId={CORRIDOR_NETWORKS[collectionCurrency(model.corridor)][0]?.display_name ?? ""}
           onNetwork={() => undefined}
           showNetwork={false}
           name={{ value: buyerName, onChange: setBuyerName }}
@@ -501,8 +524,22 @@ function placeholderSession(viewer: Viewer): SessionModel {
     parties: { exporter: EXPORTER, buyer: BUYER },
     actions: viewer === "exporter" ? ["send_invoice"] : ["continue_to_payment"],
     mpesaReference: null,
+    tradeId: null,
+    nfcToken: null,
     limits: { min: null, max: null },
   };
+}
+
+function collectionCurrency(corridor: string): "UGX" | "TZS" | "RWF" {
+  if (corridor === "KE-TZ") return "TZS";
+  if (corridor === "KE-RW") return "RWF";
+  return "UGX";
+}
+
+function corridorLabel(corridor: string): string {
+  if (corridor === "KE-TZ") return "Kenya → Tanzania";
+  if (corridor === "KE-RW") return "Kenya → Rwanda";
+  return "Kenya → Uganda";
 }
 
 function sessionFromApi(body: unknown, viewer: Viewer, fallback: SessionModel): SessionModel {
@@ -522,7 +559,9 @@ function sessionFromApi(body: unknown, viewer: Viewer, fallback: SessionModel): 
     goods,
     vukapayFee: fee,
     exporterNet: net,
-    buyerAmount: buyer.currency === "UGX" || buyer.currency === "TZS" ? buyer : fallback.buyerAmount,
+    buyerAmount: buyer.currency === "UGX" || buyer.currency === "TZS" || buyer.currency === "RWF" ? buyer : fallback.buyerAmount,
+    tradeId: typeof row.id === "string" ? row.id : fallback.tradeId,
+    nfcToken: typeof row.nfc_token === "string" ? row.nfc_token : null,
     payazaLabel: typeof fees.payaza_processing === "string" ? "Recorded on settlement" : fallback.payazaLabel,
     invoiceNumber: typeof row.invoice_id === "string" ? row.invoice_id : fallback.invoiceNumber,
     rate: typeof row.rate === "string" ? row.rate : fallback.rate,
@@ -535,7 +574,7 @@ function sessionFromApi(body: unknown, viewer: Viewer, fallback: SessionModel): 
       exporter: partyOf(parties.exporter, fallback.parties.exporter),
       buyer: partyOf(parties.buyer, fallback.parties.buyer),
     },
-    corridor: row.corridor === "KE-TZ" ? "KE-TZ" : row.corridor === "KE-UG" ? "KE-UG" : fallback.corridor,
+    corridor: row.corridor === "KE-TZ" ? "KE-TZ" : row.corridor === "KE-RW" ? "KE-RW" : row.corridor === "KE-UG" ? "KE-UG" : fallback.corridor,
   };
 }
 
@@ -594,7 +633,7 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 
 function moneyOf(value: unknown): Money | null {
   if (!isRecord(value) || typeof value.amount_minor !== "string") return null;
-  if (value.currency !== "KES" && value.currency !== "UGX" && value.currency !== "TZS") return null;
+  if (value.currency !== "KES" && value.currency !== "UGX" && value.currency !== "TZS" && value.currency !== "RWF") return null;
   return { amount_minor: value.amount_minor, currency: value.currency };
 }
 

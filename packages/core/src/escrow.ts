@@ -45,7 +45,7 @@ export const TRANSITIONS: Record<TradeState, readonly TradeState[]> = {
   PAYMENT_PENDING: ["FUNDED", "PAYMENT_FAILED", "PARTIALLY_FUNDED", "EXPIRED"],
   PARTIALLY_FUNDED: ["FUNDED", "REFUND_PENDING"],
   FUNDED: ["SHIPPED", "REFUND_PENDING", "DISPUTED"],
-  SHIPPED: ["DELIVERY_CLAIMED", "DISPUTED"],
+  SHIPPED: ["DELIVERY_CLAIMED", "DISPUTED", "RELEASE_PENDING"],
   DELIVERY_CLAIMED: ["RELEASE_PENDING", "DISPUTED"],
   DISPUTED: ["RELEASE_PENDING", "REFUND_PENDING", "SPLIT_PENDING"],
   RELEASE_PENDING: ["PAID_OUT", "PAYOUT_FAILED"],
@@ -74,6 +74,7 @@ export type TradeCommand =
   | "SHIP"
   | "DELIVERY_CLAIMED"
   | "CONFIRM_DELIVERY"
+  | "NFC_VERIFY"
   | "AUTO_RELEASE"
   | "DISPUTE"
   | "RESOLVE_RELEASE"
@@ -111,6 +112,7 @@ export interface TransitionInput {
   payoutIntent?: PayoutIntent;
   payazaConfirmedFailure?: boolean;
   codeMatches?: boolean;
+  nfcOk?: boolean;
   attemptCount?: number;
   maxAttempts?: number;
 }
@@ -182,6 +184,7 @@ function resolveTarget(from: TradeState, input: TransitionInput): TradeState {
     case "DELIVERY_CLAIMED":
       return "DELIVERY_CLAIMED";
     case "CONFIRM_DELIVERY":
+    case "NFC_VERIFY":
     case "AUTO_RELEASE":
     case "RESOLVE_RELEASE":
       return "RELEASE_PENDING";
@@ -235,6 +238,9 @@ function enforceGuards(from: TradeState, to: TradeState, input: TransitionInput)
   }
   if (input.command === "CONFIRM_DELIVERY" && input.codeMatches !== true) {
     throw new DomainError("VALIDATION_FAILED", "Delivery code does not match", 422);
+  }
+  if (input.command === "NFC_VERIFY" && input.nfcOk !== true) {
+    throw new DomainError("VALIDATION_FAILED", "NFC token did not authenticate", 422);
   }
   if (input.command === "AUTO_RELEASE") {
     if (!input.disputeWindowEndsAt || input.now < input.disputeWindowEndsAt) {

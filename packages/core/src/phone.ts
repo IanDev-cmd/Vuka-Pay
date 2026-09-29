@@ -9,6 +9,7 @@ export const PHONE_RULES = {
   KE: { prefix: "254", digits: 12 },
   UG: { prefix: "256", digits: 12 },
   TZ: { prefix: "255", digits: 12 },
+  RW: { prefix: "250", digits: 12 },
 } as const satisfies Record<string, PhoneRule>;
 
 export type PhoneCountry = keyof typeof PHONE_RULES;
@@ -16,6 +17,7 @@ export type PhoneCountry = keyof typeof PHONE_RULES;
 /**
  * International format, no + or spaces.
  * KES/UGX/TZS collections are 12 digits including the country prefix (Payaza momo guide).
+ * Rwanda uses the same 12-digit international length (+250 and 9 national digits).
  */
 export function normalizePhone(input: string, country: PhoneCountry): string {
   const rule = PHONE_RULES[country];

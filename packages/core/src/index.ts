@@ -12,6 +12,8 @@ export * from "./verification.js";
 export * from "./credit.js";
 export * from "./risk.js";
 export * from "./corridors.js";
+export * from "./qr.js";
+export * from "./nfc.js";
 export * from "./capabilities.js";
 export * from "./templates.js";
 export * from "./collectionDecision.js";

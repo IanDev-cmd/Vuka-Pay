@@ -1,11 +1,12 @@
-export const CURRENCIES = ["KES", "UGX", "TZS", "USD"] as const;
+export const CURRENCIES = ["KES", "UGX", "TZS", "RWF", "USD"] as const;
 export type Currency = (typeof CURRENCIES)[number];
 
-/** ISO-style minor-unit exponents. TZS is 0 per product spec (mobile-money whole units), not ISO 4217's 2. */
+/** ISO-style minor-unit exponents. UGX, TZS, and RWF are whole units. KES uses cents. */
 export const EXPONENTS: Record<Currency, number> = {
   KES: 2,
   UGX: 0,
   TZS: 0,
+  RWF: 0,
   USD: 2,
 };
 
@@ -13,6 +14,7 @@ export const CURRENCY_META: Record<Currency, { symbol: string; name: string }> =
   KES: { symbol: "KSh", name: "Kenyan shilling" },
   UGX: { symbol: "USh", name: "Ugandan shilling" },
   TZS: { symbol: "TSh", name: "Tanzanian shilling" },
+  RWF: { symbol: "FRw", name: "Rwandan franc" },
   USD: { symbol: "$", name: "US dollar" },
 };
 

@@ -16,7 +16,7 @@ const TABS = [
 export function InvoiceScreen({ initialTab = "invoice" }: { initialTab?: "invoice" | "trades" | "payouts" }) {
   const [tab, setTab] = useState(initialTab);
   const [amount, setAmount] = useState("45,000");
-  const [currency, setCurrency] = useState<"UGX" | "TZS">("UGX");
+  const [currency, setCurrency] = useState<"UGX" | "TZS" | "RWF">("UGX");
   const [live, setLive] = useState<BuyerQuote | null>(null);
   const [corridors, setCorridors] = useState<CorridorMeta[]>([]);
   const [networkName, setNetworkName] = useState("MTN MoMo");
@@ -59,7 +59,7 @@ export function InvoiceScreen({ initialTab = "invoice" }: { initialTab?: "invoic
 
   const networks = networksFor(currency, corridors);
   const selected = networks.find((row) => row.display_name === networkName) ?? networks[0];
-  const flag = currency === "UGX" ? "UG" : "TZ";
+  const flag = currency === "TZS" ? "TZ" : currency === "RWF" ? "RW" : "UG";
 
   const top: CardFace = {
     label: "Invoice amount",
@@ -78,9 +78,10 @@ export function InvoiceScreen({ initialTab = "invoice" }: { initialTab?: "invoic
       options: [
         { id: "UGX", label: "UGX", flag: "UG" },
         { id: "TZS", label: "TZS", flag: "TZ" },
+        { id: "RWF", label: "RWF", flag: "RW" },
       ],
       onSelect: (id) => {
-        if (id === "UGX" || id === "TZS") setCurrency(id);
+        if (id === "UGX" || id === "TZS" || id === "RWF") setCurrency(id);
       },
     },
     subline: "",
@@ -163,7 +164,9 @@ export function InvoiceScreen({ initialTab = "invoice" }: { initialTab?: "invoic
       <QuoteCard
         tabs={TABS}
         activeTab={tab}
-        onTab={setTab}
+        onTab={(id) => {
+          if (id === "invoice" || id === "trades" || id === "payouts") setTab(id);
+        }}
         top={top}
         bottom={bottom}
         rateText={rateText}
@@ -205,7 +208,7 @@ export function InvoiceScreen({ initialTab = "invoice" }: { initialTab?: "invoic
   );
 }
 
-function networksFor(currency: "UGX" | "TZS", corridors: CorridorMeta[]): NetworkOption[] {
+function networksFor(currency: "UGX" | "TZS" | "RWF", corridors: CorridorMeta[]): NetworkOption[] {
   const fromApi = corridors.find((row) => row.currency === currency)?.networks ?? [];
   if (fromApi.length > 0) return fromApi;
   return CORRIDOR_NETWORKS[currency];

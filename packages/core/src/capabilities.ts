@@ -59,6 +59,11 @@ export function buildCapabilities(input: CapabilityInput): { tenant: "test" | "l
         network("TZS") ? NOT_EXERCISED : "No verified TZS customer_bank_code is configured",
       ),
       payazaRail(
+        "momo.collection.rwf",
+        collectionOk("RWF") && network("RWF"),
+        network("RWF") ? NOT_EXERCISED : "No verified RWF customer_bank_code is configured",
+      ),
+      payazaRail(
         "momo.collection.kes",
         collectionOk("KES") && network("KES"),
         network("KES") ? NOT_EXERCISED : "SAFKEN is documented but this corridor is not the pilot collection path",
