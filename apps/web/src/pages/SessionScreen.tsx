@@ -231,14 +231,7 @@ export function SessionScreen({
                 </span>
               </button>
             ))}
-            {error ? (
-              <button type="button" className="next-card" onClick={() => navigate("/")}>
-                <span className="next-copy">
-                  <strong>Amina Traders → Kato Wholesale</strong>
-                  <small>→</small>
-                </span>
-              </button>
-            ) : null}
+            {error ? <p className="session-error">{error}</p> : null}
             {trades && trades.length === 0 && !error ? <p>—</p> : null}
           </section>
         ) : null}

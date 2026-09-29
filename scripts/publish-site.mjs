@@ -11,7 +11,7 @@ if (!statSync(dist, { throwIfNoEntry: false })?.isDirectory()) {
 
 const keep = new Set(["assets", "index.html", "manifest.webmanifest", "sw.js", "icon-192.png", "icon-512.png"]);
 for (const name of readdirSync(root)) {
-  if (name.startsWith("workbox-") && name.endsWith(".js")) keep.add(name);
+  if (name.startsWith("workbox-") && name.endsWith(".js")) rmSync(join(root, name), { force: true });
 }
 
 rmSync(join(root, "assets"), { recursive: true, force: true });

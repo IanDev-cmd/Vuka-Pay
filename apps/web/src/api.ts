@@ -15,7 +15,7 @@ const TOKEN_KEY = "vukapay_access_token";
 const TRADES_CACHE_KEY = "vukapay_trades_cache";
 
 export function apiBase(): string {
-  const configured = import.meta.env.VITE_API_URL;
+  const configured = import.meta.env.VITE_API_URL || (import.meta.env.PROD ? "https://vukapay-api.onrender.com" : "");
   return configured ? configured.replace(/\/$/, "") : "";
 }
 
