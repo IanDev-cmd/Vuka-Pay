@@ -11,6 +11,7 @@
     "packages/*"
   ],
   "scripts": {
+    "build": "npm run build -w @vukapay/web",
     "dev": "npm run dev -w @vukapay/api",
     "worker": "npm run dev -w @vukapay/worker",
     "test": "vitest run",
