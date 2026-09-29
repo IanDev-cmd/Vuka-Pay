@@ -1,0 +1,14 @@
+{
+  "name": "@vukapay/worker",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": { "dev": "tsx src/main.ts", "start": "tsx src/main.ts" },
+  "dependencies": {
+    "@vukapay/api": "*",
+    "@vukapay/core": "*",
+    "@vukapay/db": "*",
+    "@vukapay/payaza": "*",
+    "pg-boss": "^10.3.2"
+  }
+}

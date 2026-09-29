@@ -1,0 +1,92 @@
+# VukaPay on Render. Web services stay on the Starter plan.
+# Payaza keys are dashboard-only. Do not put them in this file.
+services:
+  - type: web
+    name: vukapay-api
+    runtime: node
+    plan: starter
+    buildCommand: npm install && npx prisma generate --schema packages/db/prisma/schema.prisma
+    preDeployCommand: npx prisma db push --schema packages/db/prisma/schema.prisma --skip-generate
+    startCommand: npm run start -w @vukapay/api
+    healthCheckPath: /health
+    envVars:
+      - key: NODE_VERSION
+        value: "20"
+      - key: NODE_ENV
+        value: production
+      - key: DATABASE_URL
+        fromDatabase:
+          name: vukapay-db
+          property: connectionString
+      - key: APP_SECRET
+        generateValue: true
+      - key: PAYAZA_TENANT
+        value: test
+      - key: PAYAZA_BASE_URL
+        value: https://api.payaza.africa/live/
+      - key: PAYAZA_PUBLIC_KEY
+        sync: false
+      - key: PAYAZA_SECRET_KEY
+        sync: false
+      - key: PAYAZA_TRANSACTION_PIN
+        sync: false
+      - key: PAYAZA_COLLECTION_CODES_JSON
+        sync: false
+      - key: PAYAZA_KES_MOMO_BANK_CODE
+        sync: false
+      - key: FEE_BPS
+        value: "150"
+      - key: FX_SPREAD_BPS
+        value: "150"
+      - key: CREDIT_ENABLED
+        value: "false"
+
+  - type: worker
+    name: vukapay-worker
+    runtime: node
+    plan: starter
+    buildCommand: npm install && npx prisma generate --schema packages/db/prisma/schema.prisma
+    startCommand: npm run start -w @vukapay/worker
+    envVars:
+      - key: NODE_VERSION
+        value: "20"
+      - key: NODE_ENV
+        value: production
+      - key: DATABASE_URL
+        fromDatabase:
+          name: vukapay-db
+          property: connectionString
+      - key: APP_SECRET
+        fromService:
+          name: vukapay-api
+          type: web
+          envVarKey: APP_SECRET
+      - key: PAYAZA_TENANT
+        value: test
+      - key: PAYAZA_PUBLIC_KEY
+        fromService:
+          name: vukapay-api
+          type: web
+          envVarKey: PAYAZA_PUBLIC_KEY
+      - key: PAYAZA_SECRET_KEY
+        fromService:
+          name: vukapay-api
+          type: web
+          envVarKey: PAYAZA_SECRET_KEY
+      - key: PAYAZA_TRANSACTION_PIN
+        fromService:
+          name: vukapay-api
+          type: web
+          envVarKey: PAYAZA_TRANSACTION_PIN
+
+  - type: web
+    name: vukapay-web
+    runtime: static
+    buildCommand: npm install && npm run build -w @vukapay/web
+    staticPublishPath: apps/web/dist
+
+databases:
+  - name: vukapay-db
+    databaseName: vukapay
+    plan: basic-256mb
+    postgresMajorVersion: "16"

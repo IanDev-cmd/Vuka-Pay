@@ -1,0 +1,11 @@
+node_modules/
+dist/
+.env
+.env.local
+*.log
+coverage/
+.prisma/
+apps/api/openapi.json
+docs/verification-log.json
+uploads/
+apps/web/*.png

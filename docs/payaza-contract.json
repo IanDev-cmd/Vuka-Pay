@@ -1,0 +1,29 @@
+{
+  "fetched_at": "2026-09-28",
+  "openapi_url": "https://docs.payaza.africa/openapi.json",
+  "base_url": "https://api.payaza.africa/live/",
+  "fx_or_conversion_in_openapi": false,
+  "tier1": [
+    { "method": "GET", "path": "payaza-account/api/v1/mainaccounts", "source": "guides/getting-started.md", "in_openapi": false },
+    { "method": "GET", "path": "payaza-account/api/v1/mainaccounts/merchant/enquiry/main", "source": "view-payaza-account-details.md", "in_openapi": true },
+    { "method": "POST", "path": "subsidiary/collections/v1/process-collection", "source": "momo process collection", "in_openapi": true, "money_moving": true },
+    { "method": "GET", "path": "subsidiary/collections/v1/check-status", "source": "momo status", "in_openapi": true },
+    { "method": "POST", "path": "subsidiary/funding/v1/process-collection", "source": "test account funding", "in_openapi": true, "tenant": "test" },
+    { "method": "POST", "path": "subsidiary/collections/v1/process-otp", "source": "xof otp", "in_openapi": true },
+    { "method": "POST", "path": "payout-receptor/payout", "source": "initiate transfer", "in_openapi": true, "money_moving": true },
+    { "method": "GET", "path": "payaza-account/api/v1/mainaccounts/transaction/status", "source": "guides/transfers.md", "in_openapi": false },
+    { "method": "GET", "path": "payaza-account/api/v1/mainaccounts/merchant/transaction/{transaction_reference}", "source": "openapi.json", "in_openapi": true, "note": "not used as a fallback" },
+    { "method": "POST", "path": "payaza-account/api/v1/mainaccounts/merchant/provider/enquiry", "source": "name enquiry", "currencies": ["NGN", "GHS"] },
+    { "method": "GET", "path": "payaza-account/api/v1/mainaccounts/merchant/banks/{currency_code}", "source": "bank codes" }
+  ],
+  "tier2_gated": [
+    "merchant-collection/merchant/virtual_account/generate_virtual_account",
+    "card/card_charge/",
+    "card/auth_capture/authorize",
+    "refund-chargeback/refund/merchant/api/refund",
+    "payment-link/merchant/create-payment-link",
+    "settlement/settlement/merchant/split-account",
+    "payaza-account/api/v1/subaccounts/merchant"
+  ],
+  "unknowns": "docs/OPEN_QUESTIONS.md"
+}

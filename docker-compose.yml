@@ -1,0 +1,13 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: vukapay
+      POSTGRES_PASSWORD: vukapay
+      POSTGRES_DB: vukapay
+    ports:
+      - "5432:5432"
+    volumes:
+      - vukapay_pg:/var/lib/postgresql/data
+volumes:
+  vukapay_pg:

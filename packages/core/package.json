@@ -1,0 +1,12 @@
+{
+  "name": "@vukapay/core",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "ulid": "^2.3.0"
+  }
+}

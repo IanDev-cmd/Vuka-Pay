@@ -1,0 +1,384 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id           String   @id
+  email        String   @unique
+  passwordHash String
+  role         String
+  phone        String?
+  displayName  String
+  language     String   @default("en")
+  createdAt    DateTime @default(now())
+  business     Business?
+  refreshTokens RefreshToken[]
+}
+
+model RefreshToken {
+  id        String   @id
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  tokenHash String   @unique
+  expiresAt DateTime
+  revokedAt DateTime?
+  createdAt DateTime @default(now())
+}
+
+model Business {
+  id               String   @id
+  userId           String   @unique
+  user             User     @relation(fields: [userId], references: [id])
+  legalName        String
+  tradingName      String
+  country          String   @default("KE")
+  kycTier          String   @default("NONE")
+  nationalIdNumber String?
+  kraPin           String?
+  createdAt        DateTime @default(now())
+  payoutMethods    PayoutMethod[]
+  invoices         Invoice[]
+  partnerships     TradingPartnership[]
+}
+
+model KycDocument {
+  id         String   @id
+  businessId String
+  kind       String
+  objectKey  String
+  createdAt  DateTime @default(now())
+}
+
+model PayoutMethod {
+  id               String    @id
+  businessId       String
+  business         Business  @relation(fields: [businessId], references: [id])
+  currency         String
+  phone            String
+  accountName      String
+  status           String
+  lockedTradeId    String?
+  coolingOffUntil  DateTime?
+  verifiedAt       DateTime?
+  otpHash          String?
+  otpExpiresAt     DateTime?
+  createdAt        DateTime  @default(now())
+}
+
+model TradingPartnership {
+  id            String   @id
+  businessId    String
+  business      Business @relation(fields: [businessId], references: [id])
+  partnerCode   String
+  buyerName     String
+  buyerPhone    String
+  buyerCountry  String
+  networkCode   String?
+  currency      String
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  @@unique([businessId, partnerCode])
+}
+
+model Invoice {
+  id              String   @id
+  businessId      String
+  business        Business @relation(fields: [businessId], references: [id])
+  status          String
+  corridorId      String
+  buyerName       String
+  buyerPhone      String
+  buyerCountry    String
+  networkCode     String?
+  currency        String
+  itemsMinor      BigInt
+  feeMinor        BigInt
+  exporterNetMinor BigInt
+  buyerAmountMinor BigInt
+  midRate         String
+  spreadBps       Int
+  quoteExpiresAt  DateTime
+  quoteSources    Json
+  notes           String?
+  shippingDeadline DateTime?
+  disputeWindowHours Int?
+  fingerprint     String
+  partnershipId   String?
+  createdAt       DateTime @default(now())
+  items           InvoiceItem[]
+  trade           Trade?
+}
+
+model InvoiceItem {
+  id          String  @id
+  invoiceId   String
+  invoice     Invoice @relation(fields: [invoiceId], references: [id])
+  description String
+  quantity    Int
+  unitMinor   BigInt
+}
+
+model FxQuote {
+  id               String   @id
+  invoiceId        String?
+  fromCurrency     String
+  toCurrency       String
+  midRate          String
+  spreadBps        Int
+  itemsMinor       BigInt
+  feeMinor         BigInt
+  buyerAmountMinor BigInt
+  exporterNetMinor BigInt
+  sources          Json
+  expiresAt        DateTime
+  createdAt        DateTime @default(now())
+}
+
+model FxRateObservation {
+  id        String   @id
+  source    String
+  base      String
+  quote     String
+  rate      String
+  asOf      DateTime
+  createdAt DateTime @default(now())
+}
+
+model Trade {
+  id                   String    @id
+  invoiceId            String    @unique
+  invoice              Invoice   @relation(fields: [invoiceId], references: [id])
+  businessId           String
+  state                String
+  corridorId           String
+  buyerCurrency        String
+  itemsMinor           BigInt
+  feeMinor             BigInt
+  exporterNetMinor     BigInt
+  quotedBuyerMinor     BigInt
+  heldBuyerMinor       BigInt    @default(0)
+  quoteExpiresAt       DateTime
+  invoiceDeadline      DateTime
+  disputeWindowEndsAt  DateTime?
+  buyerName            String
+  buyerPhone           String
+  payoutMethodId       String
+  payoutIntent         String?
+  attemptCount         Int       @default(0)
+  deliveryCodeHash     String?
+  shipWaybill          String?
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
+  events               TradeEvent[]
+  collections          Collection[]
+  payouts              Payout[]
+  disputes             Dispute[]
+  proofs               DeliveryProof[]
+}
+
+model TradeEvent {
+  id          String   @id
+  tradeId     String
+  trade       Trade    @relation(fields: [tradeId], references: [id])
+  fromState   String
+  toState     String
+  command     String
+  actor       String
+  reason      String
+  payloadHash String
+  effects     Json
+  createdAt   DateTime @default(now())
+}
+
+model Collection {
+  id                   String   @id
+  tradeId              String
+  trade                Trade    @relation(fields: [tradeId], references: [id])
+  transactionReference String   @unique
+  networkCode          String
+  phone                String
+  status               String
+  amountMinor          BigInt
+  currency             String
+  rawResponse          Json?
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+}
+
+model Payout {
+  id                   String   @id
+  tradeId              String
+  trade                Trade    @relation(fields: [tradeId], references: [id])
+  transactionReference String   @unique
+  kind                 String
+  status               String
+  currency             String
+  amountMinor          BigInt
+  feeMinor             BigInt   @default(0)
+  bankCode             String?
+  accountNumber        String
+  accountName          String
+  batchReference       String?
+  failureConfirmed     Boolean  @default(false)
+  lastError            String?
+  rawResponse          Json?
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+}
+
+model Refund {
+  id          String   @id
+  tradeId     String
+  payoutId    String?
+  currency    String
+  amountMinor BigInt
+  status      String
+  createdAt   DateTime @default(now())
+}
+
+model LedgerAccount {
+  id       String @id
+  code     String
+  currency String
+  @@unique([code, currency])
+}
+
+model LedgerTransaction {
+  id        String   @id
+  tradeId   String?
+  kind      String
+  createdAt DateTime @default(now())
+  entries   LedgerEntry[]
+}
+
+model LedgerEntry {
+  id            String   @id
+  transactionId String
+  transaction   LedgerTransaction @relation(fields: [transactionId], references: [id])
+  accountCode   String
+  currency      String
+  debitMinor    BigInt   @default(0)
+  creditMinor   BigInt   @default(0)
+}
+
+model DeliveryProof {
+  id        String   @id
+  tradeId   String
+  trade     Trade    @relation(fields: [tradeId], references: [id])
+  kind      String
+  objectKey String?
+  waybillNo String?
+  note      String?
+  createdAt DateTime @default(now())
+}
+
+model Dispute {
+  id         String   @id
+  tradeId    String
+  trade      Trade    @relation(fields: [tradeId], references: [id])
+  reason     String
+  status     String
+  decision   String?
+  note       String?
+  createdAt  DateTime @default(now())
+  evidence   DisputeEvidence[]
+}
+
+model DisputeEvidence {
+  id         String   @id
+  disputeId  String
+  dispute    Dispute  @relation(fields: [disputeId], references: [id])
+  objectKey  String?
+  note       String?
+  createdAt  DateTime @default(now())
+}
+
+model PayazaEvent {
+  id                   String    @id
+  rawBody              String
+  signatureOk          Boolean
+  transactionReference String?
+  dedupeKey            String?   @unique
+  receivedAt           DateTime  @default(now())
+  processedAt          DateTime?
+  processError         String?
+}
+
+model Notification {
+  id        String   @id
+  channel   String
+  toMasked  String
+  template  String
+  status    String
+  createdAt DateTime @default(now())
+}
+
+model TradeRecordRow {
+  id              String   @id
+  tradeId         String   @unique
+  businessId      String
+  corridorId      String
+  terminalState   String
+  counterpartyKey String
+  amountKesMinor  BigInt
+  onTime          Boolean?
+  disputed        Boolean
+  disputeOutcome  String?
+  completedAt     DateTime
+}
+
+model CreditConsent {
+  id          String    @id
+  businessId  String
+  lenderName  String
+  tokenHash   String    @unique
+  expiresAt   DateTime
+  revokedAt   DateTime?
+  createdAt   DateTime  @default(now())
+}
+
+model AuditLog {
+  id        String   @id
+  actorId   String
+  action    String
+  target    String
+  payload   Json
+  createdAt DateTime @default(now())
+}
+
+model IdempotencyKey {
+  id           String   @id
+  key          String
+  userScope    String
+  method       String
+  path         String
+  requestHash  String
+  statusCode   Int
+  responseBody Json
+  createdAt    DateTime @default(now())
+  @@unique([key, userScope, method, path])
+}
+
+model FeatureFlag {
+  key       String   @id
+  enabled   Boolean
+  updatedAt DateTime @updatedAt
+}
+
+model TreasuryConversion {
+  id            String   @id
+  sellCurrency  String
+  sellMinor     BigInt
+  buyCurrency   String
+  buyMinor      BigInt
+  rate          String
+  counterparty  String
+  evidenceRef   String
+  actorId       String
+  createdAt     DateTime @default(now())
+}

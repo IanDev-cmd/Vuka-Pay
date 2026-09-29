@@ -1,0 +1,31 @@
+{
+  "name": "vukapay",
+  "private": true,
+  "version": "0.1.0",
+  "description": "VukaPay backend: conditional-release trade payments on Payaza rails.",
+  "engines": {
+    "node": ">=20"
+  },
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "npm run dev -w @vukapay/api",
+    "worker": "npm run dev -w @vukapay/worker",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsc -p packages/core/tsconfig.json --noEmit && tsc -p packages/payaza/tsconfig.json --noEmit && tsc -p packages/contract/tsconfig.json --noEmit && tsc -p packages/api-client/tsconfig.json --noEmit && tsc -p apps/api/tsconfig.json --noEmit && tsc -p apps/worker/tsconfig.json --noEmit",
+    "prisma:generate": "npm run generate -w @vukapay/db",
+    "openapi": "tsx scripts/write-openapi.ts",
+    "verify:payaza": "tsx scripts/verify-payaza.ts",
+    "reconcile": "tsx scripts/reconcile.ts",
+    "replay:webhook": "tsx scripts/replay-webhook.ts"
+  },
+  "devDependencies": {
+    "@types/node": "^22.15.21",
+    "tsx": "^4.20.3",
+    "typescript": "^5.8.3",
+    "vitest": "^3.2.4"
+  }
+}
