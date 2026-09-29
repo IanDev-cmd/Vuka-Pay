@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { ApiError, createInvoice, request, sendInvoice } from "../api";
-import { Avatar, type PartyFace } from "../components/Avatar";
+import { CloneBoard, shareOf } from "../components/CloneBoard";
+import type { PartyFace } from "../components/Avatar";
 import { DeliveryActions } from "../components/DeliveryActions";
 import { PaymentQr } from "../components/PaymentQr";
 import { PhoneSheet } from "../components/PhoneSheet";
@@ -64,7 +65,6 @@ export function SessionScreen({
   const preview = !tradeId && !token;
   const [model, setModel] = useState<SessionModel | null>(() => (preview ? placeholderSession(viewer) : null));
   const [error, setError] = useState<string | null>(null);
-  const [termsOpen, setTermsOpen] = useState(false);
   const [payOpen, setPayOpen] = useState(false);
   const [sheet, setSheet] = useState<"send" | "code" | "dispute" | null>(null);
   const [buyerName, setBuyerName] = useState(BUYER.display_name);
@@ -100,7 +100,6 @@ export function SessionScreen({
   }, [payOpen]);
 
   const button = model ? centerButton(viewer, model) : { id: "", label: "", disabled: true, hidden: true };
-  const faces = model ? partyCards(model) : [];
 
   async function onButton() {
     setError(null);
@@ -167,115 +166,21 @@ export function SessionScreen({
     }
   }
 
+  const netShare = model ? shareOf(model.exporterNet?.amount_minor, model.goods.amount_minor) : { ratio: 0, label: "—" };
+  const invoiceShare = model?.exporterNet ? { ratio: Math.max(0, 100 - netShare.ratio), label: `${Math.max(0, 100 - netShare.ratio).toFixed(1)}%` } : { ratio: 50, label: "—" };
+
   return (
-    <div className="session-page">
-      <div className="session-shell">
-        {!model ? <p className="progress-line">{error ?? "…"}</p> : null}
-
-        {model ? (
-          <div className="session-grid">
-            <div className="headline-block">
-              <h1 className="session-title">
-                Your trade is protected
-                <br />
-                until <em>delivery</em>
-              </h1>
-              <p className="progress-line">{progressLine(model.state)}</p>
-            </div>
-
-            <article className="summary-card">
-              <div className="party-row">
-                <div className="party-faces">
-                  <Avatar party={model.parties.exporter} size={42} />
-                  <Avatar party={model.parties.buyer} size={42} />
-                </div>
-                <p className="party-names">
-                  {model.parties.exporter.display_name} → {model.parties.buyer.display_name}
-                </p>
-              </div>
-              <p className="summary-kicker">{model.state === "PAID_OUT" ? "Paid out" : "Invoice total"}</p>
-              <p className="summary-total">
-                {model.state === "PAID_OUT"
-                  ? formatMoney(model.exporterNet ?? model.goods, true)
-                  : formatMoney(model.goods, true)}
-              </p>
-              <div className="fee-row">
-                <span>Goods value</span>
-                <strong>{formatMoney(model.goods, true)}</strong>
-              </div>
-              <div className="fee-row">
-                <span>VukaPay fee</span>
-                <strong>{model.vukapayFee ? formatMoney(model.vukapayFee, true) : "—"}</strong>
-              </div>
-              <div className="fee-row">
-                <span>Payaza processing fee</span>
-                <strong>{model.payazaLabel}</strong>
-              </div>
-              <div className="fee-row">
-                <span>Exporter receives</span>
-                <strong>{model.exporterNet ? formatMoney(model.exporterNet, true) : "—"}</strong>
-              </div>
-              {model.state === "PAID_OUT" ? (
-                <div className="fee-row">
-                  <span>M-Pesa reference</span>
-                  <strong>{model.mpesaReference ?? "—"}</strong>
-                </div>
-              ) : null}
-              {button.hidden ? null : (
-                <button type="button" className="summary-button" disabled={button.disabled || busy} onClick={() => void onButton()}>
-                  {button.label}
-                </button>
-              )}
-              {!preview && model ? (
-                <DeliveryActions
-                  viewer={viewer}
-                  state={model.state}
-                  nfcToken={model.nfcToken}
-                  busy={busy}
-                  onShip={async () => {
-                    if (!tradeId) return null;
-                    const payload = await postJson(`/v1/trades/${encodeURIComponent(tradeId)}/ship`, {});
-                    if (!payload || typeof payload !== "object" || !("nfc_token" in payload)) return null;
-                    const tokenValue = (payload as { nfc_token?: unknown }).nfc_token;
-                    return typeof tokenValue === "string" ? tokenValue : null;
-                  }}
-                  onVerify={async (tag) => {
-                    const path = token
-                      ? `/v1/pay/${encodeURIComponent(token)}/verify-nfc`
-                      : `/v1/trades/${encodeURIComponent(tradeId ?? "")}/verify-nfc`;
-                    await postJson(path, { token: tag });
-                  }}
-                  onCode={() => setSheet("code")}
-                />
-              ) : null}
-              {viewer === "buyer" && model.state === "PAID_OUT" ? <p className="hint">Receipt</p> : null}
-            </article>
-
-            <aside className="next-column">
-              <h2>What to do next?</h2>
-              {faces.map((card) => (
-                <article key={card.id} className="next-card">
-                  <span className="next-copy">
-                    <strong>{card.label}</strong>
-                    <small>→</small>
-                  </span>
-                  <Avatar party={card.party} size={56} />
-                </article>
-              ))}
-              {error ? <p className="session-error">{error}</p> : null}
-            </aside>
-
-            <section className={termsOpen ? "terms open" : "terms"}>
-              <button type="button" className="terms-toggle field-name" onClick={() => setTermsOpen((open) => !open)}>
-                Deal terms
-              </button>
-              <div className="terms-body">
-                <label className="field">
-                  <span className="field-name">Goods value</span>
-                  <div className="money-box">
-                    <span>KES</span>
+    <>
+      <CloneBoard
+        title="Protected until delivery"
+        rows={
+          model
+            ? [
+                {
+                  label: "Goods value",
+                  value: (
                     <input
-                      type="text"
+                      aria-label="Goods value"
                       inputMode="decimal"
                       disabled={!editable}
                       value={formatMoney(model.goods)}
@@ -284,47 +189,36 @@ export function SessionScreen({
                         if (!minor) return;
                         setModel((current) =>
                           current
-                            ? {
-                                ...current,
-                                goods: { amount_minor: minor, currency: "KES" },
-                                vukapayFee: null,
-                                exporterNet: null,
-                              }
+                            ? { ...current, goods: { amount_minor: minor, currency: "KES" }, vukapayFee: null, exporterNet: null }
                             : current,
                         );
                       }}
                     />
-                    <div className="slider-track" aria-hidden="true">
-                      <span className="slider-thumb" />
-                    </div>
-                  </div>
-                  <div className="range-labels">
-                    <span>{model.limits.min ?? ""}</span>
-                    <span>{model.limits.max ?? ""}</span>
-                  </div>
-                </label>
-                <div className="field">
-                  <span className="field-name">Ship within</span>
-                  <div className="split">
+                  ),
+                },
+                {
+                  label: "Ship within",
+                  value: (
                     <input
-                      type="text"
+                      aria-label="Ship within"
                       inputMode="numeric"
                       disabled={!editable}
                       value={model.shipDays}
                       onChange={(event) =>
                         setModel((current) =>
-                          current ? { ...current, shipDays: event.target.value.replace(/\D/g, ""), dispatchOn: dispatchLabel(dispatchDate(event.target.value.replace(/\D/g, ""))) } : current,
+                          current
+                            ? { ...current, shipDays: event.target.value.replace(/\D/g, ""), dispatchOn: dispatchLabel(dispatchDate(event.target.value.replace(/\D/g, ""))) }
+                            : current,
                         )
                       }
                     />
-                    <div className="suffix-box">days</div>
-                  </div>
-                  <p className="hint">Dispatch by {model.dispatchOn}</p>
-                </div>
-                <div className="pair">
-                  <label className="field">
-                    <span className="field-name">Dispute window</span>
+                  ),
+                },
+                {
+                  label: "Dispute window",
+                  value: (
                     <select
+                      aria-label="Dispute window"
                       disabled={!editable}
                       value={model.disputeHours}
                       onChange={(event) => {
@@ -338,17 +232,65 @@ export function SessionScreen({
                       <option value={48}>48 h</option>
                       <option value={72}>72 h</option>
                     </select>
-                  </label>
-                  <label className="field">
-                    <span className="field-name">Corridor</span>
-                    <div className="readonly-box">{corridorLabel(model.corridor)}</div>
-                  </label>
-                </div>
-              </div>
-            </section>
-          </div>
-        ) : null}
-      </div>
+                  ),
+                },
+                { label: "Corridor", value: corridorLabel(model.corridor) },
+              ]
+            : [
+                { label: "Goods value", value: "…" },
+                { label: "Ship within", value: "…" },
+                { label: "Dispute window", value: "…" },
+                { label: "Corridor", value: "…" },
+              ]
+        }
+        stats={
+          model
+            ? [
+                { label: "Invoice total", value: formatMoney(model.goods), share: invoiceShare.label, tone: "light" },
+                {
+                  label: "Exporter receives",
+                  value: model.exporterNet ? formatMoney(model.exporterNet) : "—",
+                  share: netShare.label,
+                  tone: "blue",
+                },
+              ]
+            : [
+                { label: "Invoice total", value: "…", share: "—", tone: "light" },
+                { label: "Exporter receives", value: "…", share: "—", tone: "blue" },
+              ]
+        }
+        chart={netShare.ratio}
+        totalLabel={model ? progressLine(model.state) : "Held until delivery"}
+        totalValue={model ? formatMoney(model.state === "PAID_OUT" ? (model.exporterNet ?? model.goods) : model.goods, true) : "—"}
+        actionLabel={button.hidden ? "Held until delivery" : button.label}
+        actionDisabled={button.hidden || button.disabled || busy || !model}
+        onAction={() => void onButton()}
+        note={error ?? (model?.state === "PAID_OUT" && model.mpesaReference ? `M-Pesa ${model.mpesaReference}` : null)}
+        extra={
+          !preview && model ? (
+            <DeliveryActions
+              viewer={viewer}
+              state={model.state}
+              nfcToken={model.nfcToken}
+              busy={busy}
+              onShip={async () => {
+                if (!tradeId) return null;
+                const payload = await postJson(`/v1/trades/${encodeURIComponent(tradeId)}/ship`, {});
+                if (!payload || typeof payload !== "object" || !("nfc_token" in payload)) return null;
+                const tokenValue = (payload as { nfc_token?: unknown }).nfc_token;
+                return typeof tokenValue === "string" ? tokenValue : null;
+              }}
+              onVerify={async (tag) => {
+                const path = token
+                  ? `/v1/pay/${encodeURIComponent(token)}/verify-nfc`
+                  : `/v1/trades/${encodeURIComponent(tradeId ?? "")}/verify-nfc`;
+                await postJson(path, { token: tag });
+              }}
+              onCode={() => setSheet("code")}
+            />
+          ) : null
+        }
+      />
 
       {payOpen && model ? (
         <div className="pay-overlay" role="dialog" aria-label="Payment">
@@ -421,7 +363,7 @@ export function SessionScreen({
           </div>
         </div>
       ) : null}
-    </div>
+    </>
   );
 }
 
@@ -510,26 +452,6 @@ function centerButton(viewer: Viewer, model: SessionModel): { id: string; label:
     return { id: "wait", label: "Waiting for buyer", disabled: true, hidden: false };
   }
   return { id: "", label: "", disabled: true, hidden: true };
-}
-
-function partyCards(model: SessionModel): { id: string; label: string; party: PartyFace }[] {
-  const exporter = model.parties.exporter;
-  const business = exporter.business_name || exporter.display_name;
-  return [
-    { id: "exporter", label: exporter.display_name, party: exporter },
-    { id: "buyer", label: model.parties.buyer.display_name, party: model.parties.buyer },
-    {
-      id: "logo",
-      label: business,
-      party: {
-        display_name: business,
-        business_name: business,
-        avatar_url: null,
-        logo_url: exporter.logo_url,
-        badge: null,
-      },
-    },
-  ];
 }
 
 function progressLine(state: string): string {

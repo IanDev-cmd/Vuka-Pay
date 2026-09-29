@@ -177,24 +177,6 @@ export async function getPayStatus(token: string): Promise<PayStatus> {
   return { collection_status, trade_state, in_hold: money(body.held_buyer_amount) };
 }
 
-export interface CorridorMeta {
-  currency: "KES" | "UGX" | "TZS" | "RWF";
-  networks: NetworkOption[];
-}
-
-export async function getCorridors(): Promise<CorridorMeta[]> {
-  const body = await request<unknown>("/v1/meta/corridors");
-  const rows = Array.isArray(body) ? body : isRecord(body) && Array.isArray(body.corridors) ? body.corridors : [];
-  const corridors: CorridorMeta[] = [];
-  for (const row of rows) {
-    if (!isRecord(row)) continue;
-    const currency = row.collection_currency ?? row.currency;
-    if (currency !== "KES" && currency !== "UGX" && currency !== "TZS" && currency !== "RWF") continue;
-    corridors.push({ currency, networks: readNetworks(row.networks) });
-  }
-  return corridors;
-}
-
 export interface InvoiceDraft {
   items: { description: string; quantity: number; unit: Money }[];
   buyer: { name: string; phone: string; country: "KE" | "UG" | "TZ" | "RW"; network: string; currency: "KES" | "UGX" | "TZS" | "RWF" };

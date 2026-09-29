@@ -1,9 +1,9 @@
 import { useEffect, useRef, useState } from "react";
 import { ApiError, getBalance, listPayouts, type PayoutListItem, type WalletBalance } from "../api";
+import { CloneBoard, shareOf } from "../components/CloneBoard";
 import { formatMoney } from "../format";
 import { navigate } from "../nav";
 import type { Money } from "../types";
-import "../wallet.css";
 
 interface WalletRow {
   id: string;
@@ -56,85 +56,43 @@ export function WalletScreen() {
   const rows = rowsFrom(balance, payouts);
   const selected = rows.find((row) => row.id === selectedId) ?? rows[0];
 
+  const shown = rows.slice(0, 4);
+  while (shown.length < 4) shown.push({ id: `empty-${shown.length}`, label: "Balance", badge: null, amount: null, tradeId: null });
+  const held = shareOf(balance.in_hold?.amount_minor, sumMinors([balance.in_hold, balance.paid_out, balance.pending_payout]));
+  const selectedShare = shareOf(selected?.amount?.amount_minor, sumMinors([balance.in_hold, balance.paid_out, balance.pending_payout]));
+
   return (
-    <div className="wallet-page">
-      <div className="wallet-shell">
-        <h1 className="wallet-title">Wallet</h1>
-        <p className="wallet-sub">We hold your money safely until the goods arrive.</p>
-        {receivedNote ? <p className="wallet-sub">{receivedNote}</p> : null}
-        {error ? <p className="wallet-error">{error}</p> : null}
-
-        <div className="wallet-grid">
-          <div className="tx-list">
-            {rows.map((row) => (
-              <button
-                key={row.id}
-                type="button"
-                className={row.id === selected?.id ? "tx-row selected" : "tx-row"}
-                onClick={() => setSelectedId(row.id)}
-              >
-                <span className="tx-radio" aria-hidden="true">
-                  {row.id === selected?.id ? (
-                    <svg width="12" height="12" viewBox="0 0 12 12">
-                      <path d="M2.2 6.2 L4.8 8.8 L9.8 3.4" fill="none" stroke="#5823ef" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
-                    </svg>
-                  ) : null}
-                </span>
-                <span className="tx-copy">
-                  <strong>{row.label}</strong>
-                  {row.badge ? <span className="tx-badge">{row.badge}</span> : null}
-                </span>
-                <span className="tx-amount">
-                  {row.amount ? formatMoney(row.amount) : "—"}
-                  {row.amount ? <small>{row.amount.currency}</small> : null}
-                </span>
-              </button>
-            ))}
-          </div>
-
-          <div className="balance-wrap">
-            <article className="balance-card">
-              <p className="balance-kicker">{selected?.label ?? "In hold"}</p>
-              <p className={selected?.amount ? "balance-total" : "balance-total empty"}>
-                {selected?.amount ? (
-                  <>
-                    <span>{selected.amount.currency}</span>
-                    {formatMoney(selected.amount)}
-                  </>
-                ) : (
-                  "—"
-                )}
-              </p>
-              <div className="balance-stats">
-                <div>
-                  <span>In hold</span>
-                  <strong>{balance.in_hold ? formatMoney(balance.in_hold, true) : "—"}</strong>
-                </div>
-                <div>
-                  <span>Paid out</span>
-                  <strong>{balance.paid_out ? formatMoney(balance.paid_out, true) : "—"}</strong>
-                </div>
-                <div>
-                  <span>Pending payout</span>
-                  <strong>{balance.pending_payout ? formatMoney(balance.pending_payout, true) : "—"}</strong>
-                </div>
-              </div>
-              <button
-                type="button"
-                className="wallet-action"
-                aria-disabled={selected?.tradeId ? undefined : true}
-                onClick={() => {
-                  if (selected?.tradeId) navigate(`/trades/${selected.tradeId}`);
-                }}
-              >
-                Open trade
-              </button>
-            </article>
-          </div>
-        </div>
-      </div>
-    </div>
+    <CloneBoard
+      title="Wallet"
+      rows={shown.map((row) => ({
+        label: row.badge ? `${row.label} · ${row.badge}` : row.label,
+        value: row.amount ? formatMoney(row.amount, true) : "—",
+        selected: row.id === selected?.id,
+        onSelect: () => setSelectedId(row.id),
+      }))}
+      stats={[
+        { label: "In hold", value: balance.in_hold ? formatMoney(balance.in_hold) : "—", share: held.label, tone: "light" },
+        { label: selected?.label ?? "Paid out", value: selected?.amount ? formatMoney(selected.amount) : "—", share: selectedShare.label, tone: "blue" },
+      ]}
+      chart={selectedShare.ratio}
+      totalLabel="We hold your money safely until the goods arrive."
+      totalValue={selected?.amount ? formatMoney(selected.amount, true) : "—"}
+      actionLabel="Open trade"
+      actionDisabled={!selected?.tradeId}
+      onAction={() => {
+        if (selected?.tradeId) navigate(`/trades/${selected.tradeId}`);
+      }}
+      note={receivedNote ?? error}
+    />
   );
+}
+
+function sumMinors(amounts: Array<Money | null>): string {
+  let total = 0n;
+  for (const amount of amounts) {
+    if (amount && /^\d+$/.test(amount.amount_minor)) total += BigInt(amount.amount_minor);
+  }
+  return total.toString();
 }
 
 function rowsFrom(balance: WalletBalance, payouts: PayoutListItem[]): WalletRow[] {
