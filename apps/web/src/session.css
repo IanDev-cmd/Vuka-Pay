@@ -39,7 +39,7 @@
   top: 70px;
   width: 420px;
   height: 520px;
-  background: radial-gradient(closest-side, rgba(214, 236, 220, 0.85), rgba(247, 248, 250, 0) 72%);
+  background: radial-gradient(closest-side, rgba(221, 208, 255, 0.85), rgba(247, 248, 250, 0) 72%);
   pointer-events: none;
 }
 
@@ -93,7 +93,7 @@
 
 .session-nav button[aria-current="page"] {
   color: #1c2430;
-  box-shadow: inset 0 -2px 0 #1bb82b;
+  box-shadow: inset 0 -2px 0 #5823ef;
 }
 
 .menu-button {
@@ -149,7 +149,7 @@
 
 .session-title em {
   font-style: normal;
-  color: #1bb82b;
+  color: #5823ef;
 }
 
 .progress-line {
@@ -219,7 +219,7 @@
   bottom: -2px;
   height: 4px;
   border-radius: 999px;
-  background: linear-gradient(90deg, #d7f5de 0%, #1bb82b 58%, #e4e7ee 58%);
+  background: linear-gradient(90deg, #ddd0ff 0%, #5823ef 58%, #e4e7ee 58%);
   pointer-events: none;
 }
 
@@ -231,8 +231,8 @@
   height: 14px;
   transform: translate(-50%, -50%);
   border-radius: 50%;
-  background: #1bb82b;
-  box-shadow: 0 0 0 3px #fff, 0 0 0 4px #1bb82b;
+  background: #5823ef;
+  box-shadow: 0 0 0 3px #fff, 0 0 0 4px #5823ef;
 }
 
 .slider {
@@ -241,7 +241,7 @@
   height: 4px;
   margin: 12px 0 6px;
   border-radius: 999px;
-  background: linear-gradient(90deg, #d9f5df, #1bb82b);
+  background: linear-gradient(90deg, #ddd0ff, #5823ef);
   outline: none;
 }
 
@@ -250,9 +250,9 @@
   width: 16px;
   height: 16px;
   border-radius: 50%;
-  background: #1bb82b;
+  background: #5823ef;
   border: 3px solid #fff;
-  box-shadow: 0 0 0 1px #1bb82b;
+  box-shadow: 0 0 0 1px #5823ef;
 }
 
 .range-labels {
@@ -372,7 +372,7 @@
   margin-top: 16px;
   border: 0;
   border-radius: 0;
-  background: #1bb82b;
+  background: #5823ef;
   color: #fff;
   font-size: 16px;
   font-weight: 600;
@@ -469,8 +469,8 @@ button.next-card { cursor: pointer; }
   display: inline-grid;
   place-items: center;
   border-radius: 50%;
-  background: #e7f6ea;
-  color: #127a28;
+  background: #efe8ff;
+  color: #5823ef;
   font-size: 12px;
   font-weight: 700;
   overflow: visible;
@@ -493,7 +493,7 @@ button.next-card { cursor: pointer; }
   width: 14px;
   height: 14px;
   border-radius: 50%;
-  background: #1bb82b;
+  background: #5823ef;
   border: 2px solid #fff;
   display: grid;
   place-items: center;
@@ -584,7 +584,7 @@ button.next-card { cursor: pointer; }
   width: 100%;
   border: 0;
   border-radius: 10px;
-  background: #1bb82b;
+  background: #5823ef;
   color: #fff;
   font: inherit;
   font-weight: 600;

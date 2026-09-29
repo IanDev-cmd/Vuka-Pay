@@ -4,7 +4,8 @@
   --muted: #9a9aa3;
   --label: #a3a4a8;
   --pill: #f4f4f5;
-  --blue: #3d7bff;
+  --ux: #5823ef;
+  --blue: #5823ef;
   --danger: #b42318;
   --card-width: 440px;
   color: var(--ink);
@@ -322,18 +323,8 @@ button, input { font: inherit; color: inherit; }
   font-weight: 600;
   letter-spacing: -0.01em;
   cursor: pointer;
-  background: linear-gradient(
-    180deg,
-    #6aa6ff 0%,
-    #3f7dff 20%,
-    #316ef4 40%,
-    #9fd4ff 50%,
-    #e9f8ff 54%,
-    #8ec0ff 62%,
-    #3d7cf8 76%,
-    #67a2ff 100%
-  );
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.5), 0 8px 18px rgba(47, 110, 248, 0.18);
+  background: #5823ef;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.28), 0 8px 18px rgba(88, 35, 239, 0.22);
 }
 
 .cta::before {
@@ -344,7 +335,7 @@ button, input { font: inherit; color: inherit; }
   top: 58%;
   height: 14%;
   border-radius: 999px;
-  background: rgba(186, 230, 255, 0.85);
+  background: rgba(210, 190, 255, 0.7);
   filter: blur(6px);
   pointer-events: none;
 }

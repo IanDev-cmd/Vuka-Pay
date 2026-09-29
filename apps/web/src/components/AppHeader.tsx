@@ -16,7 +16,7 @@ export function AppHeader({ page }: { page: HeaderPage }) {
     <header className="session-bar app-header">
       <button type="button" className="wordmark" onClick={() => go("/")}>
         <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true">
-          <path d="M2.2 8.2 L6.1 12.1 L13.8 3.6" fill="none" stroke="#1bb82b" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
+          <path d="M2.2 8.2 L6.1 12.1 L13.8 3.6" fill="none" stroke="#5823ef" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
         </svg>
         VukaPay
       </button>

@@ -28,7 +28,7 @@
   border: 0;
   background: transparent;
   padding: 0;
-  color: #1342b8;
+  color: #5823ef;
   font-size: 22px;
   font-weight: 700;
   letter-spacing: -0.03em;
@@ -52,7 +52,7 @@
   display: block;
   width: 18px;
   height: 2px;
-  background: #1342b8;
+  background: #5823ef;
   border-radius: 2px;
 }
 
@@ -232,7 +232,7 @@
 
 .balance-total {
   margin: 8px 0 22px;
-  color: #0038ea;
+  color: #5823ef;
   font-size: 64px;
   line-height: 1;
   font-weight: 700;
@@ -280,7 +280,7 @@
   padding: 0 22px;
   border: 0;
   border-radius: 0;
-  background: #fb0e2c;
+  background: #5823ef;
   color: #fff;
   font-size: 16px;
   font-weight: 600;
